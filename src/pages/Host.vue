@@ -58,8 +58,13 @@ const toggleVirtualDisplay = async () => {
     else await vd.open()
 }
 
-watch(host.stream, (s) => {
-    if (previewEl.value) previewEl.value.srcObject = s
+// 用 watchEffect 同时跟踪 previewEl 和 stream 的变化
+// 修 bug：首次共享时 stream 先于 previewEl 挂载，原来的 watch 只在 stream 变时触发，
+// 而 previewEl 后挂载时不会重新赋 srcObject，导致预览空白
+watchEffect(() => {
+    if (previewEl.value && host.stream.value) {
+        previewEl.value.srcObject = host.stream.value
+    }
 })
 
 // 画质预设

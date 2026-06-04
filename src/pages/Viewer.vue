@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 // 观众端：全屏视频 + 状态浮层
 // signal host 直接用 window.location.hostname（URL 里的 IP / 域名）
-import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSignaling } from '~/composables/useSignaling'
 import { useViewer } from '~/composables/useViewer'
@@ -14,8 +14,12 @@ const sig = useSignaling()
 const viewer = useViewer(sig)
 const videoEl = useTemplateRef<HTMLVideoElement>('videoEl')
 
-watch(viewer.remoteStream, (s) => {
-    if (videoEl.value) videoEl.value.srcObject = s
+watchEffect(() => {
+    if (videoEl.value && viewer.remoteStream.value) {
+        videoEl.value.srcObject = viewer.remoteStream.value
+        // 显式 play() —— 某些场景下 autoplay 不自动触发，需要主动调
+        videoEl.value.play().catch(e => console.warn('[viewer] video.play() failed:', e))
+    }
 })
 
 onMounted(() => {
@@ -56,7 +60,8 @@ const hasStream = computed(() => !!viewer.remoteStream.value)
 <template>
     <div class="relative h-screen w-screen overflow-hidden bg-black text-white"
          @mousemove="hideSoon" @touchstart="hideSoon">
-        <video ref="videoEl" autoplay playsinline
+        <!-- muted 是为了通过浏览器自动播放策略；流本身无音轨，加 muted 无副作用 -->
+        <video ref="videoEl" autoplay muted playsinline
                class="absolute inset-0 h-full w-full object-contain"
                @dblclick="toggleFullscreen" />
 

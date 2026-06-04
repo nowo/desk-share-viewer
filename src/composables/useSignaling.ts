@@ -23,6 +23,11 @@ export const useSignaling = () => {
     let manualClose = false
     let signalHost: string | null = null
     const handlers = new Set<(m: ISignalMsg) => void>()
+    // 发送队列：WS 还没 open 时缓存消息，open 后一起 flush
+    // 修 bug：首次共享时 startShare 内部 sendOffer 在 sig.connect 之前触发，
+    // 没队列的话这条 offer 被静默丢弃，观众端就看不到画面
+    const pendingQueue: ISignalMsg[] = []
+    const MAX_QUEUE = 32
 
     const buildUrl = async (): Promise<string> => {
         const port = await getSignalPort()
@@ -36,6 +41,9 @@ export const useSignaling = () => {
     const send = (msg: ISignalMsg) => {
         if (ws.value?.readyState === WebSocket.OPEN) {
             ws.value.send(JSON.stringify(msg))
+        } else if (msg.type !== 'ping') {
+            // ping 不入队（保活无关业务）；其他消息缓存等 WS open 后 flush
+            if (pendingQueue.length < MAX_QUEUE) pendingQueue.push(msg)
         }
     }
 
@@ -68,8 +76,14 @@ export const useSignaling = () => {
             lastError.value = null
             reconnectAttempt = 0
             startPing()
+            // join 必须最先发（服务器据此把这条连接绑到房间）
             if (currentRoom && currentRole) {
-                send({ type: 'join', room: currentRoom, role: currentRole })
+                sock.send(JSON.stringify({ type: 'join', room: currentRoom, role: currentRole }))
+            }
+            // flush 缓存的消息（offer / ice / 等）
+            while (pendingQueue.length > 0) {
+                const msg = pendingQueue.shift()!
+                sock.send(JSON.stringify(msg))
             }
         }
 
@@ -110,6 +124,7 @@ export const useSignaling = () => {
         ws.value = null
         connected.value = false
         peerJoined.value = false
+        pendingQueue.length = 0
     }
 
     const onMessage = (fn: (m: ISignalMsg) => void) => {
