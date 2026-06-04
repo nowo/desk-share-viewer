@@ -31,7 +31,7 @@
         "build:electron": "esbuild electron/main.ts --bundle --platform=node --format=cjs --external:electron --external:ws --outfile=dist-electron/main.cjs && esbuild electron/preload.ts --bundle --platform=node --format=cjs --external:electron --outfile=dist-electron/preload.cjs",
         "build:electron:watch": "esbuild electron/main.ts electron/preload.ts --bundle --platform=node --format=cjs --external:electron --external:ws --outdir=dist-electron --out-extension:.js=.cjs --watch=forever",
         "dev": "bash prep-sidecars.sh && pnpm run build:electron && concurrently -k -n vite,electron \"vite\" \"wait-on http://localhost:1420 && cross-env VITE_DEV_SERVER_URL=http://localhost:1420 electron .\"",
-        "build": "bash prep-sidecars.sh universal && vue-tsc --noEmit && pnpm run build:electron && vite build && electron-builder",
+        "build": "bash prep-sidecars.sh universal && vue-tsc --noEmit && pnpm run build:electron && vite build && electron-builder --publish never",
         "build:nopack": "bash prep-sidecars.sh universal && vue-tsc --noEmit && pnpm run build:electron && vite build",
         "preview": "vite preview"
     },
