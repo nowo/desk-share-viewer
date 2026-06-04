@@ -121,7 +121,7 @@
         },
         "dmg": {
             "artifactName": "${productName}-${version}-${arch}.dmg",
-            "title": "${productName} ${version}",
+            "title": "${productName} ${version} ${arch}",
             "icon": "build/icon.icns",
             "background": "build/dmg-background.png",
             "window": {
