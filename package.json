@@ -41,6 +41,12 @@
         "vue-router": "^4.4.5",
         "ws": "^8.18.0"
     },
+    "pnpm": {
+        "onlyBuiltDependencies": [
+            "electron",
+            "esbuild"
+        ]
+    },
     "devDependencies": {
         "@iconify-json/mdi": "^1.2.3",
         "@types/node": "^22.10.5",
