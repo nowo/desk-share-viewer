@@ -48,28 +48,44 @@ CURRENT=$(node -p "require('./package.json').version")
 echo "current version: $CURRENT"
 
 # ─── 2. 计算新版本号 ────────────────────────────────────────
-# 用 pnpm version 算（支持 patch/minor/major + 具体 semver 字符串），不让它改 git
-pnpm version "$VERSION_ARG" --no-git-tag-version >/dev/null
+# 如果传的就是当前版本号 → 跳过 bump（直接给当前 HEAD 打 tag）
+# 否则交给 pnpm version 处理（支持 patch/minor/major + 具体 semver 字符串）
+if [[ "$VERSION_ARG" == "$CURRENT" ]]; then
+    echo "(version unchanged — skip bump, will tag current HEAD)"
+    NEW="$CURRENT"
+else
+    pnpm version "$VERSION_ARG" --no-git-tag-version >/dev/null
+    NEW=$(node -p "require('./package.json').version")
+fi
 
-NEW=$(node -p "require('./package.json').version")
 TAG="v${NEW}"
 echo "new version:     $NEW (tag: $TAG)"
 
 # ─── 3. tag 重名检查 ────────────────────────────────────────
+rollback_bump() {
+    if ! git diff --quiet package.json 2>/dev/null; then
+        git checkout -- package.json
+    fi
+}
+
 if git rev-parse "$TAG" >/dev/null 2>&1; then
-    echo "❌ tag $TAG already exists locally — 回滚 package.json"
-    git checkout -- package.json
+    echo "❌ tag $TAG already exists locally"
+    rollback_bump
     exit 1
 fi
 if git ls-remote --tags origin 2>/dev/null | grep -q "refs/tags/${TAG}$"; then
-    echo "❌ tag $TAG already exists on remote — 回滚 package.json"
-    git checkout -- package.json
+    echo "❌ tag $TAG already exists on remote"
+    rollback_bump
     exit 1
 fi
 
-# ─── 4. commit + tag ────────────────────────────────────────
-git add package.json
-git commit -m "chore: release $TAG"
+# ─── 4. commit（仅在有改动时） + tag ────────────────────────
+if ! git diff --quiet package.json 2>/dev/null; then
+    git add package.json
+    git commit -m "chore: release $TAG"
+else
+    echo "(no package.json change, skipping bump commit)"
+fi
 git tag -a "$TAG" -m "Release $TAG"
 
 echo ""
