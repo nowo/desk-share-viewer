@@ -1,0 +1,6 @@
+/* desk app — 简体中文（旧 locale 标识符兼容）*/
+CFBundleName = "桌面共享";
+CFBundleDisplayName = "桌面共享";
+NSScreenCaptureUsageDescription = "「桌面共享」需要屏幕录制权限以共享屏幕";
+NSCameraUsageDescription = "「桌面共享」需要请求媒体捕获能力以启用屏幕共享";
+NSMicrophoneUsageDescription = "「桌面共享」需要音频共享能力";

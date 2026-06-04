@@ -1,0 +1,6 @@
+/* desk-share-viewer — English (default) */
+CFBundleName = "desk share viewer";
+CFBundleDisplayName = "desk share viewer";
+NSScreenCaptureUsageDescription = "desk share viewer needs screen recording to share your screen.";
+NSCameraUsageDescription = "desk share viewer requests media capture capability for screen sharing.";
+NSMicrophoneUsageDescription = "desk share viewer requests audio sharing capability.";
