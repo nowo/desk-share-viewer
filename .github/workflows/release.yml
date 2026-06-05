@@ -28,6 +28,8 @@ jobs:
         uses: actions/checkout@v6
         with:
           ref: ${{ github.event.inputs.tag || github.ref }}
+          # 生成 changelog 需要完整 git 历史 + 所有 tag
+          fetch-depth: 0
 
       - name: Install pnpm
         uses: pnpm/action-setup@v6
@@ -64,12 +66,45 @@ jobs:
       - name: List artifacts
         run: ls -la release/
 
+      # 自己用 git log 生成 commit 列表（generate_release_notes 只列 PR，
+      # 直接 push main 的项目用它会得到空列表）
+      - name: Generate release notes
+        run: |
+          set -e
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          REPO_URL="https://github.com/${{ github.repository }}"
+
+          # 找上一个 v* tag，找不到 = 首次发版
+          PREV_TAG=$(git tag --sort=-version:refname --list 'v*' | grep -vx "$TAG" | head -1 || true)
+
+          if [ -n "$PREV_TAG" ]; then
+              RANGE="${PREV_TAG}..${TAG}"
+              FOOTER="**Full Changelog**: ${REPO_URL}/compare/${PREV_TAG}...${TAG}"
+          else
+              RANGE="$TAG"
+              FOOTER="**Full Changelog**: ${REPO_URL}/commits/${TAG}"
+          fi
+
+          {
+              echo "## What's Changed"
+              echo ""
+              git log "$RANGE" \
+                  --pretty=format:"- %s ([\`%h\`](${REPO_URL}/commit/%H))" \
+                  --reverse
+              echo ""
+              echo ""
+              echo "$FOOTER"
+          } > release-notes.md
+
+          echo "=== generated release notes ==="
+          cat release-notes.md
+
       - name: Publish to GitHub Release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           name: ${{ github.event.inputs.tag || github.ref_name }}
-          generate_release_notes: true
+          body_path: release-notes.md
           draft: false
           prerelease: false
           files: |
