@@ -38,7 +38,7 @@
         "build": "bash prep-sidecars.sh universal && vue-tsc --noEmit && pnpm run build:electron && vite build && electron-builder --publish never",
         "build:nopack": "bash prep-sidecars.sh universal && vue-tsc --noEmit && pnpm run build:electron && vite build",
         "preview": "vite preview",
-        "release": "changelogen --release --push",
+        "release": "changelogen --release --push --no-github",
         "lint": "eslint . --fix"
     },
     "dependencies": {
