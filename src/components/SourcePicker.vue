@@ -35,7 +35,8 @@ const tab = ref<'screen' | 'window'>('screen')
 onMounted(async () => {
     try {
         const data = await (window as any).desk.getDisplaySources() as {
-            sources: Source[], displays: Display[],
+            sources: Source[]
+            displays: Display[]
         }
         screens.value = data.sources.filter(s => s.id.startsWith('screen:'))
         windows.value = data.sources.filter(s => s.id.startsWith('window:'))
@@ -84,87 +85,93 @@ const select = (s: Source) => emit('pick', s)
 </script>
 
 <template>
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-         @click.self="emit('cancel')">
-        <div class="w-full max-w-5xl rounded-xl bg-slate-900 p-6 text-slate-100 shadow-2xl">
+    <div class="p-4 bg-black/70 flex items-center inset-0 justify-center fixed z-50"
+        @click.self="emit('cancel')">
+        <div class="text-slate-100 p-6 rounded-xl bg-slate-900 max-w-5xl w-full shadow-2xl">
             <div class="mb-4 flex items-center justify-between">
-                <h2 class="text-lg font-bold">选择要共享的内容</h2>
-                <button class="rounded p-2 text-slate-400 hover:bg-slate-800 hover:text-slate-100"
-                        @click="emit('cancel')">
+                <h2 class="text-lg font-bold">
+                    选择要共享的内容
+                </h2>
+                <button class="text-slate-400 p-2 rounded hover:text-slate-100 hover:bg-slate-800"
+                    @click="emit('cancel')">
                     <i class="i-mdi-close" />
                 </button>
             </div>
 
             <!-- 权限提示 -->
             <div v-if="!loading && allThumbsEmpty"
-                 class="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-200">
+                class="text-sm text-amber-200 mb-4 p-3 border border-amber-500/40 rounded-lg bg-amber-500/10">
                 <i class="i-mdi-alert mr-2" />
                 缩略图为空 —— Electron 还没拿到屏幕录制权限。
                 打开「系统设置 → 隐私与安全性 → 屏幕与系统音频录制」，找到 <strong>Electron</strong> 或 <strong>desk</strong>，
                 打开开关后**重启 desk app**。看不到名字就点底部「+」手动加 dev binary。
             </div>
 
-            <div class="mb-4 flex gap-1 border-b border-slate-700">
-                <button class="border-b-2 px-4 py-2 text-sm font-medium"
-                        :class="tab === 'screen' ? 'border-sky-500 text-sky-300' : 'border-transparent text-slate-400 hover:text-slate-200'"
-                        @click="tab = 'screen'">
+            <div class="mb-4 border-b border-slate-700 flex gap-1">
+                <button class="text-sm font-medium px-4 py-2 border-b-2"
+                    :class="tab === 'screen' ? 'border-sky-500 text-sky-300' : 'border-transparent text-slate-400 hover:text-slate-200'"
+                    @click="tab = 'screen'">
                     整个屏幕（{{ screens.length }}）
                 </button>
-                <button class="border-b-2 px-4 py-2 text-sm font-medium"
-                        :class="tab === 'window' ? 'border-sky-500 text-sky-300' : 'border-transparent text-slate-400 hover:text-slate-200'"
-                        @click="tab = 'window'">
+                <button class="text-sm font-medium px-4 py-2 border-b-2"
+                    :class="tab === 'window' ? 'border-sky-500 text-sky-300' : 'border-transparent text-slate-400 hover:text-slate-200'"
+                    @click="tab = 'window'">
                     窗口（{{ windows.length }}）
                 </button>
             </div>
 
-            <div v-if="loading" class="py-16 text-center text-slate-400">加载中…</div>
+            <div v-if="loading" class="text-slate-400 py-16 text-center">
+                加载中…
+            </div>
 
             <div v-else class="max-h-[500px] overflow-auto">
                 <!-- 整个屏幕 -->
-                <div v-if="tab === 'screen'" class="grid grid-cols-2 gap-4 md:grid-cols-3">
+                <div v-if="tab === 'screen'" class="gap-4 grid grid-cols-2 md:grid-cols-3">
                     <div v-for="(s, i) in screens" :key="s.id"
-                         class="cursor-pointer overflow-hidden rounded-lg border-2 transition hover:shadow-lg"
-                         :class="isVirtual(s)
-                             ? 'border-amber-500 bg-amber-500/5 hover:border-amber-400'
-                             : 'border-slate-700 hover:border-sky-500'"
-                         @click="select(s)">
-                        <div class="relative aspect-video bg-black">
+                        class="border-2 rounded-lg cursor-pointer transition overflow-hidden hover:shadow-lg"
+                        :class="isVirtual(s)
+                            ? 'border-amber-500 bg-amber-500/5 hover:border-amber-400'
+                            : 'border-slate-700 hover:border-sky-500'"
+                        @click="select(s)">
+                        <div class="bg-black aspect-video relative">
                             <img v-if="!thumbnailEmpty(s)" :src="s.thumbnail" class="h-full w-full object-contain" :alt="s.name">
                             <div v-else
-                                 class="flex h-full w-full flex-col items-center justify-center bg-gradient-to-br"
-                                 :class="isVirtual(s) ? 'from-amber-900/40 to-amber-700/20' : 'from-slate-800 to-slate-900'">
-                                <i class="i-mdi-monitor mb-2 text-4xl"
-                                   :class="isVirtual(s) ? 'text-amber-400' : 'text-slate-500'" />
-                                <div class="text-2xl font-bold opacity-50">{{ i + 1 }}</div>
+                                class="flex flex-col h-full w-full items-center justify-center bg-gradient-to-br"
+                                :class="isVirtual(s) ? 'from-amber-900/40 to-amber-700/20' : 'from-slate-800 to-slate-900'">
+                                <i class="i-mdi-monitor text-4xl mb-2"
+                                    :class="isVirtual(s) ? 'text-amber-400' : 'text-slate-500'" />
+                                <div class="text-2xl font-bold opacity-50">
+                                    {{ i + 1 }}
+                                </div>
                             </div>
                             <!-- 角标 -->
                             <span v-if="tagOf(s)"
-                                  class="absolute right-2 top-2 rounded border px-2 py-0.5 text-xs font-medium"
-                                  :class="tagOf(s)!.cls">
+                                class="text-xs font-medium px-2 py-0.5 border rounded right-2 top-2 absolute"
+                                :class="tagOf(s)!.cls">
                                 {{ tagOf(s)!.text }}
                             </span>
                         </div>
-                        <div class="border-t border-slate-700 bg-slate-800 px-3 py-2">
+                        <div class="px-3 py-2 border-t border-slate-700 bg-slate-800">
                             <div class="flex items-center justify-between">
                                 <span class="text-sm font-medium">{{ s.name }}</span>
-                                <span class="font-mono text-xs text-slate-500">{{ labelOf(s) }}</span>
+                                <span class="text-xs text-slate-500 font-mono">{{ labelOf(s) }}</span>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- 窗口 -->
-                <div v-else class="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+                <div v-else class="gap-3 grid grid-cols-2 lg:grid-cols-4 md:grid-cols-3">
                     <div v-for="s in windows" :key="s.id"
-                         class="cursor-pointer overflow-hidden rounded-lg border border-slate-700 transition hover:border-sky-500 hover:shadow-lg"
-                         @click="select(s)">
-                        <div class="aspect-video bg-black">
+                        class="border border-slate-700 rounded-lg cursor-pointer transition overflow-hidden hover:border-sky-500 hover:shadow-lg"
+                        @click="select(s)">
+                        <div class="bg-black aspect-video">
                             <img v-if="!thumbnailEmpty(s)" :src="s.thumbnail" class="h-full w-full object-contain" :alt="s.name">
-                            <div v-else class="flex h-full w-full items-center justify-center bg-slate-800">
+                            <div v-else class="bg-slate-800 flex h-full w-full items-center justify-center">
                                 <i class="i-mdi-fullscreen text-3xl text-slate-500" />
                             </div>
                         </div>
-                        <div class="flex items-center gap-2 border-t border-slate-700 bg-slate-800 p-2 text-xs">
+                        <div class="text-xs p-2 border-t border-slate-700 bg-slate-800 flex gap-2 items-center">
                             <img v-if="s.appIcon" :src="s.appIcon" class="h-4 w-4">
                             <span class="truncate">{{ s.name }}</span>
                         </div>

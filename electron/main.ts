@@ -1,23 +1,24 @@
+import type { Server as HttpServer } from 'node:http'
+import type { WebSocketServer } from 'ws'
+import type { DisplayInfo, OpenOpts } from './virtual-display'
+import { networkInterfaces } from 'node:os'
+import path from 'node:path'
+import process from 'node:process'
 // Electron 主进程入口
 // - 启动 Vite dev 加载的页面（或打包后的本地文件）
 // - 启 WebSocket 信令服务
 // - 暴露 IPC 给 renderer：get-lan-ip / virtual display / sleep-lock / open-in-browser / get-display-sources
-import { app, BrowserWindow, desktopCapturer, ipcMain, Menu, screen, session, shell } from 'electron'
-import { networkInterfaces } from 'node:os'
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
-import type { Server as HttpServer } from 'node:http'
-import { WebSocketServer } from 'ws'
+import { app, BrowserWindow, desktopCapturer, ipcMain, Menu, screen, shell } from 'electron'
 import { startSignaling } from './signaling'
-import { startStaticServer } from './static-server'
 import { allowSleep, preventSleep } from './sleep-lock'
+import { startStaticServer } from './static-server'
 import {
     closeVirtualDisplay,
+
     killAll as killVirtualDisplay,
+
     openVirtualDisplay,
     virtualDisplayStatus,
-    type DisplayInfo,
-    type OpenOpts,
 } from './virtual-display'
 
 const SIGNAL_PORT = 51234
@@ -33,7 +34,9 @@ function getLanIp(): string | null {
     const ifaces = networkInterfaces()
     for (const name of Object.keys(ifaces)) {
         for (const ni of ifaces[name] ?? []) {
-            if (ni.family === 'IPv4' && !ni.internal) return ni.address
+            if (ni.family === 'IPv4' && !ni.internal) {
+                return ni.address
+            }
         }
     }
     return null
@@ -43,7 +46,9 @@ function registerIpc() {
     ipcMain.handle('get-lan-ip', () => getLanIp())
     ipcMain.handle('signal-port', () => SIGNAL_PORT)
     ipcMain.handle('prevent-sleep', () => preventSleep())
-    ipcMain.handle('allow-sleep', () => { allowSleep() })
+    ipcMain.handle('allow-sleep', () => {
+        allowSleep()
+    })
     ipcMain.handle('open-in-browser', async (_e, url: string) => {
         await shell.openExternal(url)
     })
@@ -104,7 +109,9 @@ function createWindow() {
         mainWindow.loadFile(path.join(__dirname, '../dist/index.html'))
     }
 
-    mainWindow.on('closed', () => { mainWindow = null })
+    mainWindow.on('closed', () => {
+        mainWindow = null
+    })
 }
 
 // macOS 菜单栏 app 名 + Quit / About / Hide 等也本地化
@@ -167,7 +174,7 @@ app.whenReady().then(() => {
     buildAppMenu()
     registerIpc()
     wss = startSignaling(SIGNAL_PORT)
-    console.log(`[signaling] listening on 0.0.0.0:${SIGNAL_PORT}/signal`)
+    console.warn(`[signaling] listening on 0.0.0.0:${SIGNAL_PORT}/signal`)
 
     // production：起静态 server 让 LAN 浏览器能访问 viewer URL
     // dev：Vite 已经在 1420 监听了，不重复起
@@ -179,17 +186,25 @@ app.whenReady().then(() => {
     createWindow()
 
     app.on('activate', () => {
-        if (BrowserWindow.getAllWindows().length === 0) createWindow()
+        if (BrowserWindow.getAllWindows().length === 0) {
+            createWindow()
+        }
     })
 })
 
 app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') app.quit()
+    if (process.platform !== 'darwin') {
+        app.quit()
+    }
 })
 
 app.on('before-quit', () => {
     killVirtualDisplay()
     allowSleep()
-    try { wss?.close() } catch {}
-    try { staticServer?.close() } catch {}
+    try {
+        wss?.close()
+    } catch {}
+    try {
+        staticServer?.close()
+    } catch {}
 })

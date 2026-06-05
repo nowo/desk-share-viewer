@@ -58,31 +58,35 @@ const hasStream = computed(() => !!viewer.remoteStream.value)
 </script>
 
 <template>
-    <div class="relative h-screen w-screen overflow-hidden bg-black text-white"
-         @mousemove="hideSoon" @touchstart="hideSoon">
+    <div class="text-white bg-black h-screen w-screen relative overflow-hidden"
+        @mousemove="hideSoon" @touchstart="hideSoon">
         <!-- muted 是为了通过浏览器自动播放策略；流本身无音轨，加 muted 无副作用 -->
         <video ref="videoEl" autoplay muted playsinline
-               class="absolute inset-0 h-full w-full object-contain"
-               @dblclick="toggleFullscreen" />
+            class="h-full w-full inset-0 absolute object-contain"
+            @dblclick="toggleFullscreen" />
 
         <!-- 顶部控制条 -->
         <div v-if="showControls"
-             class="absolute left-0 right-0 top-0 z-10 flex items-center justify-between bg-gradient-to-b from-black/70 to-transparent p-4 transition">
-            <button class="flex items-center gap-1 rounded px-3 py-1.5 text-sm text-slate-300 hover:bg-white/10"
-                    @click="back">
+            class="p-4 flex transition items-center left-0 right-0 top-0 justify-between absolute z-10 from-black/70 to-transparent bg-gradient-to-b">
+            <button class="text-sm text-slate-300 px-3 py-1.5 rounded flex gap-1 items-center hover:bg-white/10"
+                @click="back">
                 <i class="i-mdi-arrow-left" /> 离开
             </button>
-            <div class="font-mono text-sm">房间 {{ roomId }}</div>
-            <button class="rounded p-2 text-slate-300 hover:bg-white/10" @click="toggleFullscreen">
+            <div class="text-sm font-mono">
+                房间 {{ roomId }}
+            </div>
+            <button class="text-slate-300 p-2 rounded hover:bg-white/10" @click="toggleFullscreen">
                 <i class="i-mdi-fullscreen" />
             </button>
         </div>
 
         <!-- 等待中央浮层 -->
         <div v-if="!hasStream"
-             class="absolute inset-0 z-0 flex flex-col items-center justify-center bg-slate-900/80">
-            <i class="i-mdi-loading animate-spin mb-4 text-4xl text-sky-400" />
-            <div class="mb-2 text-lg">{{ stateText }}</div>
+            class="bg-slate-900/80 flex flex-col items-center inset-0 justify-center absolute z-0">
+            <i class="i-mdi-loading text-4xl text-sky-400 mb-4 animate-spin" />
+            <div class="text-lg mb-2">
+                {{ stateText }}
+            </div>
             <div class="text-sm text-slate-400">
                 <span :class="sig.connected.value ? 'text-emerald-400' : 'text-amber-400'">●</span>
                 信令 {{ sig.connected.value ? '已连' : '重连中' }}
@@ -90,11 +94,13 @@ const hasStream = computed(() => !!viewer.remoteStream.value)
                 <span :class="sig.peerJoined.value ? 'text-emerald-400' : 'text-slate-500'">●</span>
                 主机 {{ sig.peerJoined.value ? '在线' : '离线' }}
             </div>
-            <div v-if="viewer.error.value" class="mt-4 text-red-400">{{ viewer.error.value }}</div>
+            <div v-if="viewer.error.value" class="text-red-400 mt-4">
+                {{ viewer.error.value }}
+            </div>
         </div>
 
         <div v-else-if="showControls"
-             class="absolute bottom-4 right-4 z-10 rounded bg-black/60 px-3 py-1.5 font-mono text-xs">
+            class="text-xs font-mono px-3 py-1.5 rounded bg-black/60 bottom-4 right-4 absolute z-10">
             <span :class="sig.connected.value ? 'text-emerald-400' : 'text-amber-400'">●</span>
             {{ viewer.connectionState.value }}
         </div>

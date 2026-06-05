@@ -8,7 +8,10 @@ interface DeskApi {
     allowSleep: () => Promise<void>
     openInBrowser: (url: string) => Promise<void>
     openVirtualDisplay: (opts?: { width?: number, height?: number, hz?: number, name?: string }) => Promise<{
-        display_id: number, width: number, height: number, name: string,
+        display_id: number
+        width: number
+        height: number
+        name: string
     }>
     closeVirtualDisplay: () => Promise<void>
     virtualDisplayStatus: () => Promise<boolean>
@@ -45,6 +48,9 @@ export const allowSleep = async (): Promise<void> => {
 }
 
 export const openInBrowser = async (url: string): Promise<void> => {
-    if (!inElectron()) { window.open(url, '_blank'); return }
+    if (!inElectron()) {
+        window.open(url, '_blank')
+        return
+    }
     return window.desk!.openInBrowser(url)
 }

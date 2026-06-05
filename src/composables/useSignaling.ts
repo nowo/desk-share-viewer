@@ -36,7 +36,9 @@ export const useSignaling = () => {
         return `ws://${host}:${port}/signal`
     }
 
-    const setSignalHost = (h: string) => { signalHost = h }
+    const setSignalHost = (h: string) => {
+        signalHost = h
+    }
 
     const send = (msg: ISignalMsg) => {
         if (ws.value?.readyState === WebSocket.OPEN) {
@@ -49,23 +51,17 @@ export const useSignaling = () => {
 
     const startPing = () => {
         if (pingTimer) clearInterval(pingTimer)
-        pingTimer = setInterval(() => send({ type: 'ping' }), 20_000)
+        pingTimer = setInterval(send, 20_000, { type: 'ping' })
     }
     const stopPing = () => {
-        if (pingTimer) { clearInterval(pingTimer); pingTimer = null }
+        if (pingTimer) {
+            clearInterval(pingTimer)
+            pingTimer = null
+        }
     }
 
-    const scheduleReconnect = () => {
-        if (manualClose || reconnectTimer) return
-        const delay = Math.min(30_000, 1000 * 2 ** Math.min(reconnectAttempt, 5))
-        reconnectAttempt++
-        reconnectTimer = setTimeout(() => {
-            reconnectTimer = null
-            if (currentRoom && currentRole) open()
-        }, delay)
-    }
-
-    const open = async () => {
+    // open 用 function 声明，scheduleReconnect 里能 hoist 引用
+    async function open() {
         manualClose = false
         const url = await buildUrl()
         const sock = new WebSocket(url)
@@ -89,7 +85,11 @@ export const useSignaling = () => {
 
         sock.onmessage = (e) => {
             let msg: ISignalMsg
-            try { msg = JSON.parse(e.data) } catch { return }
+            try {
+                msg = JSON.parse(e.data)
+            } catch {
+                return
+            }
             if (msg.type === 'pong') return
             if (msg.type === 'peer-join') peerJoined.value = true
             if (msg.type === 'peer-leave') peerJoined.value = false
@@ -109,6 +109,17 @@ export const useSignaling = () => {
         }
     }
 
+    // function 声明，open 里 sock.onclose 引用得到 hoist
+    function scheduleReconnect() {
+        if (manualClose || reconnectTimer) return
+        const delay = Math.min(30_000, 1000 * 2 ** Math.min(reconnectAttempt, 5))
+        reconnectAttempt++
+        reconnectTimer = setTimeout(() => {
+            reconnectTimer = null
+            if (currentRoom && currentRole) open()
+        }, delay)
+    }
+
     const connect = (opts: { room: string, role: Role, signalHost?: string }) => {
         currentRoom = opts.room
         currentRole = opts.role
@@ -118,7 +129,10 @@ export const useSignaling = () => {
 
     const close = () => {
         manualClose = true
-        if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
+        if (reconnectTimer) {
+            clearTimeout(reconnectTimer)
+            reconnectTimer = null
+        }
         stopPing()
         ws.value?.close()
         ws.value = null

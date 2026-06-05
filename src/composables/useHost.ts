@@ -1,7 +1,7 @@
+import type { Signaling } from './useSignaling'
 // 主机端：抓屏 + WebRTC + replaceTrack + ICE restart + Mac 防休眠
 import { onBeforeUnmount, ref } from 'vue'
 import { allowSleep, preventSleep } from '~/utils/bridge'
-import type { Signaling } from './useSignaling'
 
 const ICE_SERVERS: RTCIceServer[] = [
     { urls: 'stun:stun.l.google.com:19302' },
@@ -17,11 +17,11 @@ export interface QualityPreset {
 }
 
 export const QUALITY_PRESETS: Record<string, QualityPreset> = {
-    low:    { maxWidth: 1280, maxHeight: 720,  maxFrameRate: 30, maxBitrate:  1_500_000 },
-    medium: { maxWidth: 1920, maxHeight: 1080, maxFrameRate: 30, maxBitrate:  3_000_000 },
-    high:   { maxWidth: 1920, maxHeight: 1080, maxFrameRate: 30, maxBitrate:  8_000_000 },
-    ultra:  { maxWidth: 2560, maxHeight: 1440, maxFrameRate: 30, maxBitrate: 12_000_000 },
-    '4k':   { maxWidth: 3840, maxHeight: 2160, maxFrameRate: 30, maxBitrate: 20_000_000 },
+    'low': { maxWidth: 1280, maxHeight: 720, maxFrameRate: 30, maxBitrate: 1_500_000 },
+    'medium': { maxWidth: 1920, maxHeight: 1080, maxFrameRate: 30, maxBitrate: 3_000_000 },
+    'high': { maxWidth: 1920, maxHeight: 1080, maxFrameRate: 30, maxBitrate: 8_000_000 },
+    'ultra': { maxWidth: 2560, maxHeight: 1440, maxFrameRate: 30, maxBitrate: 12_000_000 },
+    '4k': { maxWidth: 3840, maxHeight: 2160, maxFrameRate: 30, maxBitrate: 20_000_000 },
 }
 
 // 当前用的预设 —— UI 可改
@@ -50,7 +50,9 @@ export const useHost = (signaling: Signaling) => {
         conn.oniceconnectionstatechange = () => {
             iceState.value = conn.iceConnectionState
             if (conn.iceConnectionState === 'failed') {
-                try { conn.restartIce() } catch {}
+                try {
+                    conn.restartIce()
+                } catch {}
             }
         }
         pc = conn
@@ -195,7 +197,9 @@ export const useHost = (signaling: Signaling) => {
         if (!pc) return
         await pc.setRemoteDescription(sdp)
         for (const c of pendingIce.splice(0)) {
-            try { await pc.addIceCandidate(c) } catch {}
+            try {
+                await pc.addIceCandidate(c)
+            } catch {}
         }
     }
 
@@ -204,7 +208,9 @@ export const useHost = (signaling: Signaling) => {
             pendingIce.push(candidate)
             return
         }
-        try { await pc.addIceCandidate(candidate) } catch {}
+        try {
+            await pc.addIceCandidate(candidate)
+        } catch {}
     }
 
     const handlePeerJoin = async () => {
@@ -223,7 +229,16 @@ export const useHost = (signaling: Signaling) => {
     })
 
     return {
-        sharing, stream, connectionState, iceState, trackEnded, error, sleepLocked,
-        startShare, reShare, stopShare, setQuality,
+        sharing,
+        stream,
+        connectionState,
+        iceState,
+        trackEnded,
+        error,
+        sleepLocked,
+        startShare,
+        reShare,
+        stopShare,
+        setQuality,
     }
 }

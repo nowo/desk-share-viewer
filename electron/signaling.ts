@@ -6,7 +6,7 @@
 // 服务器 → 客户端:
 //   { type: 'joined'|'peer-join'|'peer-leave'|'kicked'|'error'|'pong' }
 //   { type: 'offer'|'answer'|'ice' } (透传)
-import { WebSocketServer, WebSocket } from 'ws'
+import { WebSocket, WebSocketServer } from 'ws'
 
 type Role = 'host' | 'viewer'
 
@@ -19,7 +19,9 @@ const rooms = new Map<string, Room>()
 
 const safeSend = (sock: WebSocket, data: any) => {
     if (sock.readyState === WebSocket.OPEN) {
-        try { sock.send(JSON.stringify(data)) } catch {}
+        try {
+            sock.send(JSON.stringify(data))
+        } catch {}
     }
 }
 
@@ -47,10 +49,17 @@ export function startSignaling(port: number): WebSocketServer {
     wss.on('connection', (sock) => {
         sock.on('message', (raw) => {
             let msg: any
-            try { msg = JSON.parse(raw.toString()) } catch { return }
+            try {
+                msg = JSON.parse(raw.toString())
+            } catch {
+                return
+            }
             if (!msg || typeof msg !== 'object') return
 
-            if (msg.type === 'ping') { safeSend(sock, { type: 'pong' }); return }
+            if (msg.type === 'ping') {
+                safeSend(sock, { type: 'pong' })
+                return
+            }
 
             if (msg.type === 'join') {
                 const { room: roomId, role } = msg as { room: string, role: Role }
@@ -61,7 +70,10 @@ export function startSignaling(port: number): WebSocketServer {
                 // 解绑旧
                 removeFromRooms(sock)
                 let room = rooms.get(roomId)
-                if (!room) { room = {}; rooms.set(roomId, room) }
+                if (!room) {
+                    room = {}
+                    rooms.set(roomId, room)
+                }
                 // 同角色重连：踢老的
                 const existing = role === 'host' ? room.host : room.viewer
                 if (existing && existing !== sock) {
@@ -81,7 +93,10 @@ export function startSignaling(port: number): WebSocketServer {
             // offer / answer / ice 透传
             if (msg.type === 'offer' || msg.type === 'answer' || msg.type === 'ice') {
                 const found = findPeer(sock)
-                if (!found) { safeSend(sock, { type: 'error', message: 'not in any room' }); return }
+                if (!found) {
+                    safeSend(sock, { type: 'error', message: 'not in any room' })
+                    return
+                }
                 const other = found.role === 'host' ? found.room.viewer : found.room.host
                 if (other) safeSend(other, msg)
             }

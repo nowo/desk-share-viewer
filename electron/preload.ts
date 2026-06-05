@@ -9,13 +9,16 @@ const api = {
     openInBrowser: (url: string) => ipcRenderer.invoke('open-in-browser', url) as Promise<void>,
     openVirtualDisplay: (opts?: { width?: number, height?: number, hz?: number, name?: string }) =>
         ipcRenderer.invoke('virtual-display:open', opts || {}) as Promise<{
-            display_id: number, width: number, height: number, name: string,
+            display_id: number
+            width: number
+            height: number
+            name: string
         }>,
     closeVirtualDisplay: () => ipcRenderer.invoke('virtual-display:close') as Promise<void>,
     virtualDisplayStatus: () => ipcRenderer.invoke('virtual-display:status') as Promise<boolean>,
     getDisplaySources: () => ipcRenderer.invoke('get-display-sources') as Promise<{
-        sources: { id: string, name: string, display_id: string, thumbnail: string, appIcon: string | null }[],
-        displays: { id: number, label: string, bounds: any, internal: boolean }[],
+        sources: { id: string, name: string, display_id: string, thumbnail: string, appIcon: string | null }[]
+        displays: { id: number, label: string, bounds: any, internal: boolean }[]
     }>,
 }
 

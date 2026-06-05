@@ -15,6 +15,8 @@ export function preventSleep(): boolean {
 
 export function allowSleep(): void {
     if (id === null) return
-    try { powerSaveBlocker.stop(id) } catch {}
+    try {
+        powerSaveBlocker.stop(id)
+    } catch {}
     id = null
 }

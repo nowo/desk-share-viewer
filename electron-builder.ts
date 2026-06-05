@@ -30,7 +30,7 @@ const config: Configuration = {
     mac: {
         category: 'public.app-category.utilities',
         icon: 'build/icon.icns',
-        identity: null,                                       // ad-hoc 签名，跳过 Apple Developer
+        identity: null, // ad-hoc 签名，跳过 Apple Developer
         target: [
             { target: 'dmg', arch: ['arm64', 'x64'] },
         ],
@@ -45,7 +45,7 @@ const config: Configuration = {
 
     dmg: {
         artifactName: '${productName}-${version}-${arch}.dmg',
-        title: '${productName} ${version} ${arch}',          // 加 arch 避免双架构串行打包撞 /Volumes mount 点
+        title: '${productName} ${version} ${arch}', // 加 arch 避免双架构串行打包撞 /Volumes mount 点
         icon: 'build/icon.icns',
         background: 'build/dmg-background.png',
         window: { width: 540, height: 380 },

@@ -29,7 +29,10 @@ export const useVirtualDisplay = () => {
     }
 
     const open = async (opts: IOpenOpts = {}) => {
-        if (!inElectron()) { error.value = '此功能仅在 desk 桌面应用内可用'; return }
+        if (!inElectron()) {
+            error.value = '此功能仅在 desk 桌面应用内可用'
+            return
+        }
         error.value = null
         loading.value = true
         try {
@@ -45,7 +48,9 @@ export const useVirtualDisplay = () => {
     const close = async () => {
         if (!inElectron()) return
         loading.value = true
-        try { await (window as any).desk.closeVirtualDisplay() } finally {
+        try {
+            await (window as any).desk.closeVirtualDisplay()
+        } finally {
             info.value = null
             loading.value = false
         }

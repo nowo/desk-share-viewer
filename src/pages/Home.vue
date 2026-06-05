@@ -13,50 +13,60 @@ const goViewer = () => {
 </script>
 
 <template>
-    <div class="min-h-screen bg-slate-900 text-slate-100">
-        <div class="mx-auto flex min-h-screen max-w-4xl flex-col items-center justify-center px-4 py-12">
-            <h1 class="mb-2 text-4xl font-bold tracking-tight">desk</h1>
-            <p class="mb-12 text-slate-400">屏幕共享 + 演示画布 · WebRTC P2P · 锁屏不断</p>
+    <div class="text-slate-100 bg-slate-900 min-h-screen">
+        <div class="mx-auto px-4 py-12 flex flex-col max-w-4xl min-h-screen items-center justify-center">
+            <h1 class="text-4xl tracking-tight font-bold mb-2">
+                desk
+            </h1>
+            <p class="text-slate-400 mb-12">
+                屏幕共享 + 演示画布 · WebRTC P2P · 锁屏不断
+            </p>
 
-            <div class="grid w-full gap-6 md:grid-cols-2">
+            <div class="gap-6 grid w-full md:grid-cols-2">
                 <!-- 主机 -->
-                <div class="cursor-pointer rounded-xl border border-slate-700 bg-slate-800/50 p-8 transition hover:-translate-y-1 hover:border-sky-500 hover:shadow-lg"
-                     @click="goHost">
-                    <div class="mb-3 text-sky-400">
+                <div class="p-8 border border-slate-700 rounded-xl bg-slate-800/50 cursor-pointer transition hover:border-sky-500 hover:shadow-lg hover:-translate-y-1"
+                    @click="goHost">
+                    <div class="text-sky-400 mb-3">
                         <i class="i-mdi-monitor text-4xl" />
                     </div>
-                    <h2 class="mb-2 text-2xl font-bold">我是主机</h2>
+                    <h2 class="text-2xl font-bold mb-2">
+                        我是主机
+                    </h2>
                     <p class="text-sm text-slate-400">
                         共享这台电脑的屏幕。生成 6 位房间号 + 二维码，让观众扫码加入。
                     </p>
                 </div>
 
                 <!-- 观众 -->
-                <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-8">
-                    <div class="mb-3 text-emerald-400">
+                <div class="p-8 border border-slate-700 rounded-xl bg-slate-800/50">
+                    <div class="text-emerald-400 mb-3">
                         <i class="i-mdi-cellphone text-4xl" />
                     </div>
-                    <h2 class="mb-2 text-2xl font-bold">我是观众</h2>
-                    <p class="mb-4 text-sm text-slate-400">
+                    <h2 class="text-2xl font-bold mb-2">
+                        我是观众
+                    </h2>
+                    <p class="text-sm text-slate-400 mb-4">
                         输入主机给的 6 位房间号，或扫二维码直接进入。
                     </p>
                     <div class="flex gap-2">
                         <input v-model="inputRoom" placeholder="房间号 例 234567"
-                               class="flex-1 rounded border border-slate-600 bg-slate-900 px-3 py-2 font-mono tracking-widest text-slate-100 outline-none focus:border-sky-500"
-                               inputmode="numeric" pattern="\d*" maxlength="6"
-                               @keyup.enter="goViewer">
+                            class="text-slate-100 tracking-widest font-mono px-3 py-2 outline-none border border-slate-600 rounded bg-slate-900 flex-1 focus:border-sky-500"
+                            inputmode="numeric" pattern="\d*" maxlength="6"
+                            @keyup.enter="goViewer">
                         <button :disabled="!canJoin"
-                                class="rounded bg-emerald-600 px-4 py-2 font-medium text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40"
-                                @click="goViewer">
+                            class="text-white font-medium px-4 py-2 rounded bg-emerald-600 transition hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed"
+                            @click="goViewer">
                             加入
                         </button>
                     </div>
                 </div>
             </div>
 
-            <div class="mt-12 max-w-2xl text-xs text-slate-500">
-                <p class="mb-1 font-semibold text-slate-400">特性：</p>
-                <ul class="list-inside list-disc space-y-1">
+            <div class="text-xs text-slate-500 mt-12 max-w-2xl">
+                <p class="text-slate-400 font-semibold mb-1">
+                    特性：
+                </p>
+                <ul class="list-disc list-inside space-y-1">
                     <li>LAN 内置 WebSocket 信令服务（0.0.0.0:51234），无需外部依赖</li>
                     <li>Mac 防休眠 powerSaveBlocker，共享期间系统不锁屏</li>
                     <li>断线自动重连，ICE 失败自动 restart，replaceTrack 换屏不掉房间</li>

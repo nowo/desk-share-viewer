@@ -1,6 +1,6 @@
+import type { Signaling } from './useSignaling'
 // 观众端：接收 offer，回 answer
 import { onBeforeUnmount, ref } from 'vue'
-import type { Signaling } from './useSignaling'
 
 const ICE_SERVERS: RTCIceServer[] = [
     { urls: 'stun:stun.l.google.com:19302' },
@@ -38,7 +38,9 @@ export const useViewer = (signaling: Signaling) => {
         await conn.setLocalDescription(answer)
         signaling.send({ type: 'answer', sdp: answer })
         for (const c of pendingIce.splice(0)) {
-            try { await conn.addIceCandidate(c) } catch {}
+            try {
+                await conn.addIceCandidate(c)
+            } catch {}
         }
     }
 
@@ -47,7 +49,9 @@ export const useViewer = (signaling: Signaling) => {
             pendingIce.push(candidate)
             return
         }
-        try { await pc.addIceCandidate(candidate) } catch {}
+        try {
+            await pc.addIceCandidate(candidate)
+        } catch {}
     }
 
     const reset = () => {
@@ -59,9 +63,11 @@ export const useViewer = (signaling: Signaling) => {
     }
 
     signaling.onMessage(async (m) => {
-        if (m.type === 'offer') await handleOffer(m.sdp)
-        else if (m.type === 'ice') await handleIce(m.candidate)
-        else if (m.type === 'kicked') {
+        if (m.type === 'offer') {
+            await handleOffer(m.sdp)
+        } else if (m.type === 'ice') {
+            await handleIce(m.candidate)
+        } else if (m.type === 'kicked') {
             error.value = '当前会话被新连接替换'
             reset()
         }

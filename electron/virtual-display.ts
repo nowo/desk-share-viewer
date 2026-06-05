@@ -1,6 +1,9 @@
 // desk-display sidecar 生命周期：spawn + 解析首行 JSON + 通过 stdin "quit\n" 优雅关闭
-import { spawn, ChildProcess } from 'node:child_process'
+import type { Buffer } from 'node:buffer'
+import type { ChildProcess } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import path from 'node:path'
+import process from 'node:process'
 import { app } from 'electron'
 
 export interface DisplayInfo {
@@ -32,10 +35,18 @@ export async function openVirtualDisplay(opts: OpenOpts = {}): Promise<DisplayIn
     if (child) await closeVirtualDisplay()
 
     const args: string[] = []
-    if (opts.width)  { args.push('--width',  String(opts.width)) }
-    if (opts.height) { args.push('--height', String(opts.height)) }
-    if (opts.hz)     { args.push('--hz',     String(opts.hz)) }
-    if (opts.name)   { args.push('--name',   opts.name) }
+    if (opts.width) {
+        args.push('--width', String(opts.width))
+    }
+    if (opts.height) {
+        args.push('--height', String(opts.height))
+    }
+    if (opts.hz) {
+        args.push('--hz', String(opts.hz))
+    }
+    if (opts.name) {
+        args.push('--name', opts.name)
+    }
 
     return new Promise<DisplayInfo>((resolve, reject) => {
         const proc = spawn(sidecarPath(), args, { stdio: ['pipe', 'pipe', 'pipe'] })
@@ -96,10 +107,19 @@ export async function closeVirtualDisplay(): Promise<void> {
     if (!child) return
     const proc = child
     return new Promise((resolve) => {
-        proc.once('exit', () => { child = null; resolve() })
-        try { proc.stdin?.write('quit\n') } catch {}
+        proc.once('exit', () => {
+            child = null
+            resolve()
+        })
+        try {
+            proc.stdin?.write('quit\n')
+        } catch {}
         // 兜底：3 秒后强杀
-        setTimeout(() => { try { proc.kill('SIGTERM') } catch {} }, 3000)
+        setTimeout(() => {
+            try {
+                proc.kill('SIGTERM')
+            } catch {}
+        }, 3000)
     })
 }
 
@@ -108,5 +128,10 @@ export function virtualDisplayStatus(): boolean {
 }
 
 export function killAll() {
-    if (child) { try { child.kill('SIGTERM') } catch {}; child = null }
+    if (child) {
+        try {
+            child.kill('SIGTERM')
+        } catch {}
+        child = null
+    }
 }
