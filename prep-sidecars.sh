@@ -8,6 +8,12 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+# 非 macOS 跳过 —— sidecar 用 SkyLight 私有 API，只能在 mac 上编/跑
+if [[ "$(uname)" != "Darwin" ]]; then
+    echo "==> non-macOS ($(uname)), skip sidecar build"
+    exit 0
+fi
+
 MODE="${1:-single}"
 
 if [[ "$MODE" == "universal" ]]; then

@@ -1,8 +1,21 @@
 // electron-builder 配置，从 package.json 抽出来便于扩展（跨端时会更长）
 // 改这里不用动 package.json，electron-builder 自动识别 .ts / .js / .yml 同名配置
 import type { Configuration } from 'electron-builder'
+import process from 'node:process'
 
 const LANGS = ['en', 'zh-Hans', 'zh-CN'] as const
+
+const isMac = process.platform === 'darwin'
+
+// 虚拟显示器 sidecar + macOS App Bundle lproj 都只在 macOS 打包时打进 app
+// 其他平台 extraResources 留空
+const macExtraResources = [
+    { from: 'sidecars/desk-display/.build/release/desk-display', to: 'desk-display' },
+    ...LANGS.map(lang => ({
+        from: `build/${lang}.lproj/InfoPlist.strings`,
+        to: `${lang}.lproj/InfoPlist.strings`,
+    })),
+]
 
 const config: Configuration = {
     appId: 'io.github.nowo.desk-share-viewer',
@@ -17,15 +30,7 @@ const config: Configuration = {
         'dist/**/*',
     ],
 
-    extraResources: [
-        // macOS 虚拟显示器 sidecar
-        { from: 'sidecars/desk-display/.build/release/desk-display', to: 'desk-display' },
-        // macOS App Bundle 本地化字符串
-        ...LANGS.map(lang => ({
-            from: `build/${lang}.lproj/InfoPlist.strings`,
-            to: `${lang}.lproj/InfoPlist.strings`,
-        })),
-    ],
+    extraResources: isMac ? macExtraResources : [],
 
     mac: {
         category: 'public.app-category.utilities',
@@ -52,6 +57,31 @@ const config: Configuration = {
         contents: [
             { x: 140, y: 200, type: 'file' },
             { x: 400, y: 200, type: 'link', path: '/Applications' },
+        ],
+    },
+
+    win: {
+        icon: 'build/icon.ico',
+        target: [
+            { target: 'nsis', arch: ['x64', 'arm64'] },
+        ],
+    },
+
+    nsis: {
+        artifactName: '${productName}-${version}-${arch}-setup.${ext}',
+        oneClick: false,
+        perMachine: false,
+        allowToChangeInstallationDirectory: true,
+        createDesktopShortcut: true,
+        createStartMenuShortcut: true,
+    },
+
+    linux: {
+        icon: 'build/icon.png',
+        category: 'Utility',
+        target: [
+            { target: 'AppImage', arch: ['x64', 'arm64'] },
+            { target: 'deb', arch: ['x64', 'arm64'] },
         ],
     },
 }
