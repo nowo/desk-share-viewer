@@ -18,10 +18,28 @@ permissions:
   contents: write  # 创建 Release + 上传 assets 需要
 
 jobs:
-  release:
-    name: Build + Release (macOS)
-    runs-on: macos-latest
+  # 三平台并行 build，各自上传自己的产物到同一个 Release
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            artifacts: |
+              release/*.dmg
+              release/*.dmg.blockmap
+          - os: windows-latest
+            artifacts: |
+              release/*.exe
+              release/*.exe.blockmap
+          - os: ubuntu-latest
+            artifacts: |
+              release/*.AppImage
+              release/*.deb
 
     steps:
       - name: Checkout
@@ -47,8 +65,12 @@ jobs:
         uses: actions/cache@v5
         with:
           path: |
+            ~/.cache/electron
+            ~/.cache/electron-builder
             ~/Library/Caches/electron
             ~/Library/Caches/electron-builder
+            ~\AppData\Local\electron\Cache
+            ~\AppData\Local\electron-builder\Cache
           key: ${{ runner.os }}-electron-${{ hashFiles('**/pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-electron-
@@ -56,19 +78,21 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # macOS 自带 clang + Xcode CLT，能编 ObjC sidecar；hdiutil 用来打 DMG
-      - name: Build (sidecar + Vue + Electron + DMG)
+      # macOS 自带 clang + Xcode CLT，能编 ObjC sidecar
+      # Windows / Linux 上 prep-sidecars.sh 会直接 exit 0 跳过
+      - name: Build
         run: pnpm build
         env:
           # ad-hoc 签名，跳过 Apple Developer 流程
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
       - name: List artifacts
+        shell: bash
         run: ls -la release/
 
-      # changelogen 按 conventional commit 类型分组生成变更列表，
-      # 前面拼 build/release-header.md（固定安装说明）作为 header
+      # 只在 macOS 上生成一次 release notes（任一 runner 都行，跨平台只需要一份）
       - name: Generate release notes
+        if: matrix.os == 'macos-latest'
         run: |
           set -e
           TAG="${{ github.event.inputs.tag || github.ref_name }}"
@@ -87,14 +111,15 @@ jobs:
           echo "=== generated release notes ==="
           cat release-notes.md
 
+      # 每个 runner 都上传自己的产物到同一个 Release（softprops 自动 merge 同 tag）
+      # macOS runner 额外带上 release notes 作为 body
       - name: Publish to GitHub Release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           name: ${{ github.event.inputs.tag || github.ref_name }}
-          body_path: release-notes.md
+          body_path: ${{ matrix.os == 'macos-latest' && 'release-notes.md' || '' }}
           draft: false
           prerelease: false
-          files: |
-            release/*.dmg
-            release/*.dmg.blockmap
+          fail_on_unmatched_files: false
+          files: ${{ matrix.artifacts }}
