@@ -1,0 +1,36 @@
+# Changelog
+
+
+## v0.1.2
+
+[compare changes](https://github.com/nowo/desk-share-viewer/compare/v0.1.1...v0.1.2)
+
+### 🚀 Enhancements
+
+- **build:** Electron-builder 配置加 win/linux target + 图标素材 ([15d2be4](https://github.com/nowo/desk-share-viewer/commit/15d2be4))
+- **electron:** 虚拟显示器加平台守卫，非 macOS 上 IPC 暴露 supported=false ([39d3c8d](https://github.com/nowo/desk-share-viewer/commit/39d3c8d))
+- **ui:** 虚拟显示器面板按平台条件渲染，非 macOS 自动隐藏 ([d5573bd](https://github.com/nowo/desk-share-viewer/commit/d5573bd))
+
+### 💅 Refactors
+
+- Electron-builder 配置从 package.json 抽到 electron-builder.ts ([2600441](https://github.com/nowo/desk-share-viewer/commit/2600441))
+
+### 📖 Documentation
+
+- 修正首次打开说明 ([7d4ac2c](https://github.com/nowo/desk-share-viewer/commit/7d4ac2c))
+- README + release-header 加 windows / linux 安装说明 ([85ae280](https://github.com/nowo/desk-share-viewer/commit/85ae280))
+
+### 🏡 Chore
+
+- **release:** 改用 changelogen 接管 release notes 和发版 ([69c63ea](https://github.com/nowo/desk-share-viewer/commit/69c63ea))
+- 接入 eslint (Antfu config) 并按规则改造代码 ([1dbaf4a](https://github.com/nowo/desk-share-viewer/commit/1dbaf4a))
+
+### 🤖 CI
+
+- **release:** Release notes 顶部固定加上安装说明 ([9deeec6](https://github.com/nowo/desk-share-viewer/commit/9deeec6))
+- **release:** Workflow 改 matrix 构建 mac / windows / linux ([d44e472](https://github.com/nowo/desk-share-viewer/commit/d44e472))
+
+### ❤️ Contributors
+
+- Nowo ([@nowo](https://github.com/nowo))
+
