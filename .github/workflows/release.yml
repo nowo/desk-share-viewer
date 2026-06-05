@@ -66,18 +66,24 @@ jobs:
       - name: List artifacts
         run: ls -la release/
 
-      # changelogen 按 conventional commit 类型自动分组生成 release notes
+      # changelogen 按 conventional commit 类型分组生成变更列表，
+      # 前面拼 build/release-header.md（固定安装说明）作为 header
       - name: Generate release notes
         run: |
           set -e
           TAG="${{ github.event.inputs.tag || github.ref_name }}"
           PREV=$(git tag --sort=-version:refname --list 'v*' | grep -vx "$TAG" | head -1 || true)
-          rm -f release-notes.md
+          rm -f release-notes.md release-changes.md
           if [ -n "$PREV" ]; then
-              pnpm exec changelogen --from "$PREV" --to "$TAG" -o release-notes.md
+              pnpm exec changelogen --from "$PREV" --to "$TAG" -o release-changes.md
           else
-              pnpm exec changelogen --to "$TAG" -o release-notes.md
+              pnpm exec changelogen --to "$TAG" -o release-changes.md
           fi
+          {
+              cat build/release-header.md
+              echo ""
+              cat release-changes.md
+          } > release-notes.md
           echo "=== generated release notes ==="
           cat release-notes.md
 
