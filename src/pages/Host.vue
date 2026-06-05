@@ -174,8 +174,9 @@ onBeforeUnmount(() => sig.close())
                 </div>
             </div>
 
-            <!-- 虚拟显示器面板 -->
-            <div class="mb-6 p-4 border border-amber-500/30 rounded-xl bg-amber-500/5">
+            <!-- 虚拟显示器面板：仅 macOS 主机显示（SkyLight 私有 API 不跨端） -->
+            <div v-if="vd.supported.value"
+                class="mb-6 p-4 border border-amber-500/30 rounded-xl bg-amber-500/5">
                 <div class="flex gap-4 items-start">
                     <i class="i-mdi-view-grid text-2xl text-amber-400 mt-1" />
                     <div class="flex-1">

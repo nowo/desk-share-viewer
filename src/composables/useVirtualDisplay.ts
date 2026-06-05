@@ -21,9 +21,13 @@ export const useVirtualDisplay = () => {
     const info = ref<IDisplayInfo | null>(null)
     const loading = ref(false)
     const error = ref<string | null>(null)
+    // 仅 macOS 主机支持，Windows / Linux 上 UI 直接隐藏面板
+    const supported = ref(false)
 
     const refresh = async () => {
         if (!inElectron()) return
+        supported.value = await (window as any).desk.virtualDisplaySupported() as boolean
+        if (!supported.value) return
         const active = await (window as any).desk.virtualDisplayStatus() as boolean
         if (!active) info.value = null
     }
@@ -58,5 +62,5 @@ export const useVirtualDisplay = () => {
 
     onMounted(refresh)
 
-    return { info, loading, error, open, close }
+    return { info, loading, error, supported, open, close }
 }
