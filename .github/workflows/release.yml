@@ -66,36 +66,18 @@ jobs:
       - name: List artifacts
         run: ls -la release/
 
-      # 自己用 git log 生成 commit 列表（generate_release_notes 只列 PR，
-      # 直接 push main 的项目用它会得到空列表）
+      # changelogen 按 conventional commit 类型自动分组生成 release notes
       - name: Generate release notes
         run: |
           set -e
           TAG="${{ github.event.inputs.tag || github.ref_name }}"
-          REPO_URL="https://github.com/${{ github.repository }}"
-
-          # 找上一个 v* tag，找不到 = 首次发版
-          PREV_TAG=$(git tag --sort=-version:refname --list 'v*' | grep -vx "$TAG" | head -1 || true)
-
-          if [ -n "$PREV_TAG" ]; then
-              RANGE="${PREV_TAG}..${TAG}"
-              FOOTER="**Full Changelog**: ${REPO_URL}/compare/${PREV_TAG}...${TAG}"
+          PREV=$(git tag --sort=-version:refname --list 'v*' | grep -vx "$TAG" | head -1 || true)
+          rm -f release-notes.md
+          if [ -n "$PREV" ]; then
+              pnpm exec changelogen --from "$PREV" --to "$TAG" -o release-notes.md
           else
-              RANGE="$TAG"
-              FOOTER="**Full Changelog**: ${REPO_URL}/commits/${TAG}"
+              pnpm exec changelogen --to "$TAG" -o release-notes.md
           fi
-
-          {
-              echo "## What's Changed"
-              echo ""
-              git log "$RANGE" \
-                  --pretty=format:"- %s ([\`%h\`](${REPO_URL}/commit/%H))" \
-                  --reverse
-              echo ""
-              echo ""
-              echo "$FOOTER"
-          } > release-notes.md
-
           echo "=== generated release notes ==="
           cat release-notes.md
 
