@@ -1,10 +1,10 @@
 # desk-share-viewer
 
 ![license](https://img.shields.io/badge/license-MIT-blue.svg)
-![platform](https://img.shields.io/badge/platform-macOS%2012%2B-lightgrey.svg)
+![platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg)
 ![electron](https://img.shields.io/badge/electron-33-47848F.svg)
 
-macOS 桌面屏幕共享 + 虚拟显示器一体工具。主机端跑桌面应用，观众端用浏览器看，全程 LAN 内 P2P 推流，开箱即用，无需登录、无需后端、无需第三方信令服务。
+桌面屏幕共享 + macOS 虚拟显示器一体工具。主机端跑桌面应用，观众端用浏览器看，全程 LAN 内 P2P 推流，开箱即用，无需登录、无需后端、无需第三方信令服务。
 
 ## 💡 为什么写这个？
 
@@ -30,13 +30,14 @@ macOS 桌面屏幕共享 + 虚拟显示器一体工具。主机端跑桌面应�
 
 ## ✨ 特性
 
-- 🖥️ **macOS 虚拟显示器**（DeskPad 等价物）—— 通过 SkyLight 私有 API 创建一块隐藏显示器，把要演示的窗口拖进去，避免桌面通知 / 微信弹窗泄露
+- 🖥️ **macOS 虚拟显示器** *(仅 macOS)* —— 通过 SkyLight 私有 API 创建一块隐藏显示器，把要演示的窗口拖进去，避免桌面通知 / 微信弹窗泄露
 - 📡 **WebRTC P2P 推流** —— 端到端直传，画质码率可调（720p / 1080p / 1440p / 4K）
 - 🌐 **内置 LAN 信令 + 静态 server** —— 主机起来后，同 WiFi 任意设备浏览器输 URL 就能加入
 - 🔢 **6 位数字房间号 + QR 码** —— 手机扫一扫即入
 - 🔁 **断线自恢复** —— WebSocket 指数退避重连 + ICE restart + replaceTrack 换屏不掉房间
 - 💤 **共享期防休眠** —— Electron powerSaveBlocker
 - 🌏 **中英文** —— 菜单栏跟随系统语言切换
+- 🪟 **跨端主机** —— macOS / Windows / Linux 都能跑（虚拟显示器仅 macOS）
 
 ## 📸 截图
 
@@ -44,20 +45,21 @@ macOS 桌面屏幕共享 + 虚拟显示器一体工具。主机端跑桌面应�
 
 ## 📦 下载安装
 
-去 [Releases](https://github.com/nowo/desk-share-viewer/releases) 页面拿对应架构的 DMG：
+去 [Releases](https://github.com/nowo/desk-share-viewer/releases) 页面拿对应平台 / 架构的包：
 
-| Mac 类型 | 文件 |
-|---|---|
-| M 系列芯片（M1/M2/M3/M4） | `desk-share-viewer-<version>-arm64.dmg` |
-| Intel | `desk-share-viewer-<version>-x64.dmg` |
+| 系统 | 架构 | 文件 |
+|---|---|---|
+| **macOS** | Apple Silicon | `desk-share-viewer-<version>-arm64.dmg` |
+| macOS | Intel | `desk-share-viewer-<version>-x64.dmg` |
+| **Windows** | x64 / arm64 | `desk-share-viewer-<version>-<arch>-setup.exe` |
+| **Linux** | x64 / arm64 | `desk-share-viewer-<version>.AppImage` |
+| Linux (Debian/Ubuntu) | x64 / arm64 | `desk-share-viewer-<version>_<arch>.deb` |
 
-不确定的话 → 苹果菜单「关于本机 → 芯片」一行能看到。
+Mac 不确定芯片：苹果菜单「关于本机 → 芯片」一行能看到。
 
 ### 首次打开
 
-app 是 ad-hoc 签名（没花 $99 走 Apple Developer），从浏览器下载后 macOS Gatekeeper 会拦，**双击会报「已损坏」**。
-
-终端跑一行清除隔离属性即可：
+**macOS** —— app 是 ad-hoc 签名（没花 $99 走 Apple Developer），从浏览器下载后 macOS Gatekeeper 会拦，**双击会报「已损坏」**。终端跑一行清除隔离属性即可：
 
 ```bash
 xattr -cr /Applications/desk-share-viewer.app
@@ -67,15 +69,27 @@ xattr -cr /Applications/desk-share-viewer.app
 
 > ⚠️ 不要走「右键 → 打开」—— macOS 15/26 起这个老办法已经失效，会显示同样的「已损坏」对话框。
 
+**Windows** —— 双击 `*-setup.exe` 安装，SmartScreen 会拦截：「更多信息」→「仍要运行」放行（未做 EV 代码签名）。
+
+**Linux** —— AppImage 加可执行权限即可运行：
+
+```bash
+chmod +x desk-share-viewer-*.AppImage
+./desk-share-viewer-*.AppImage
+```
+
+或者用 `.deb`：`sudo dpkg -i desk-share-viewer-*.deb`
+
 ## 🚀 使用流程
 
 ### 主机端
 
 1. 启动 desk-share-viewer
-2. 点「我是主机」→ 「打开虚拟屏」→ macOS 系统设置里能看到「desk virtual display」
-3. 把要演示的 app 窗口拖进虚拟屏
-4. 点「开始共享屏幕」→ 自定义 picker 弹出，选「desk virtual display」（带「虚拟屏」橙色标签）
-5. 显示 6 位房间号 + QR 码
+2. *(macOS only)* 点「打开虚拟屏」→ 系统设置里能看到「desk virtual display」→ 把要演示的 app 窗口拖进虚拟屏
+3. 点「开始共享屏幕」→ 自定义 picker 弹出：
+   - macOS：选「desk virtual display」（带「虚拟屏」橙色标签）或任一真实显示器 / 窗口
+   - Windows / Linux：选任一真实显示器 / 窗口
+4. 显示 6 位房间号 + QR 码
 
 ### 观众端
 
@@ -117,9 +131,9 @@ http://<主机IP>:1420/#/<6位房间号>
 
 ### 前置
 
-- macOS 12+
-- Node.js 20+ + pnpm 8+
-- Xcode Command Line Tools（编 ObjC sidecar 用）：`xcode-select --install`
+- macOS 12+ / Windows 10+ / 主流 Linux 发行版
+- Node.js 20+ + pnpm 10+
+- *(仅 macOS 上需要)* Xcode Command Line Tools（编 ObjC sidecar 用）：`xcode-select --install`
 
 ### 启动 dev
 
@@ -138,9 +152,12 @@ pnpm dev
 pnpm build
 ```
 
-产出在 `release/` 目录：
-- `desk-share-viewer-<v>-arm64.dmg`
-- `desk-share-viewer-<v>-x64.dmg`
+产出在 `release/` 目录，按当前运行平台决定打什么包：
+- macOS → `*-arm64.dmg` + `*-x64.dmg`
+- Windows → `*-arm64-setup.exe` + `*-x64-setup.exe`
+- Linux → `*.AppImage` + `*.deb`
+
+跨平台发版由 GitHub Actions matrix 三平台并行打包统一上传到 Release，本地一般只编当前平台。
 
 ### 项目结构
 
