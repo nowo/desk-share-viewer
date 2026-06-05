@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.1.3
+
+[compare changes](https://github.com/nowo/desk-share-viewer/compare/v0.1.2...v0.1.3)
+
+### 🩹 Fixes
+
+- **build:** Windows ico 补齐 10 个尺寸 (16~256)，修复任务栏/资源管理器图标模糊 ([e94847f](https://github.com/nowo/desk-share-viewer/commit/e94847f))
+
+### ❤️ Contributors
+
+- Nowo ([@nowo](https://github.com/nowo))
+
 ## v0.1.2
 
 [compare changes](https://github.com/nowo/desk-share-viewer/compare/v0.1.1...v0.1.2)
