@@ -14,9 +14,8 @@ import { allowSleep, preventSleep } from './sleep-lock'
 import { startStaticServer } from './static-server'
 import {
     closeVirtualDisplay,
-
+    isVirtualDisplaySupported,
     killAll as killVirtualDisplay,
-
     openVirtualDisplay,
     virtualDisplayStatus,
 } from './virtual-display'
@@ -53,6 +52,7 @@ function registerIpc() {
         await shell.openExternal(url)
     })
 
+    ipcMain.handle('virtual-display:supported', () => isVirtualDisplaySupported())
     ipcMain.handle('virtual-display:open', async (_e, opts: OpenOpts): Promise<DisplayInfo> => {
         return openVirtualDisplay(opts || {})
     })

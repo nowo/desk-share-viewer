@@ -7,6 +7,7 @@ const api = {
     preventSleep: () => ipcRenderer.invoke('prevent-sleep') as Promise<boolean>,
     allowSleep: () => ipcRenderer.invoke('allow-sleep') as Promise<void>,
     openInBrowser: (url: string) => ipcRenderer.invoke('open-in-browser', url) as Promise<void>,
+    virtualDisplaySupported: () => ipcRenderer.invoke('virtual-display:supported') as Promise<boolean>,
     openVirtualDisplay: (opts?: { width?: number, height?: number, hz?: number, name?: string }) =>
         ipcRenderer.invoke('virtual-display:open', opts || {}) as Promise<{
             display_id: number

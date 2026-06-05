@@ -22,6 +22,10 @@ export interface OpenOpts {
 
 let child: ChildProcess | null = null
 
+export function isVirtualDisplaySupported(): boolean {
+    return process.platform === 'darwin'
+}
+
 function sidecarPath(): string {
     // dev：从源码 sidecar 输出取
     if (!app.isPackaged) {
@@ -32,6 +36,9 @@ function sidecarPath(): string {
 }
 
 export async function openVirtualDisplay(opts: OpenOpts = {}): Promise<DisplayInfo> {
+    if (!isVirtualDisplaySupported()) {
+        throw new Error('虚拟显示器仅在 macOS 上可用')
+    }
     if (child) await closeVirtualDisplay()
 
     const args: string[] = []

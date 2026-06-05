@@ -7,6 +7,7 @@ interface DeskApi {
     preventSleep: () => Promise<boolean>
     allowSleep: () => Promise<void>
     openInBrowser: (url: string) => Promise<void>
+    virtualDisplaySupported: () => Promise<boolean>
     openVirtualDisplay: (opts?: { width?: number, height?: number, hz?: number, name?: string }) => Promise<{
         display_id: number
         width: number
