@@ -55,12 +55,17 @@ macOS 桌面屏幕共享 + 虚拟显示器一体工具。主机端跑桌面应�
 
 ### 首次打开
 
-未签名 ad-hoc 二进制，macOS Gatekeeper 默认会拦。两种绕过方式：
+app 是 ad-hoc 签名（没花 $99 走 Apple Developer），从浏览器下载后 macOS Gatekeeper 会拦，**双击会报「已损坏」**。
 
-- **右键 → 打开**（不是双击），弹窗里点「打开」
-- 或终端：`xattr -d com.apple.quarantine /Applications/desk-share-viewer.app`
+终端跑一行清除隔离属性即可：
 
-之后正常使用。
+```bash
+xattr -cr /Applications/desk-share-viewer.app
+```
+
+之后正常双击打开，再不会拦。
+
+> ⚠️ 不要走「右键 → 打开」—— macOS 15/26 起这个老办法已经失效，会显示同样的「已损坏」对话框。
 
 ## 🚀 使用流程
 
