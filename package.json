@@ -4,7 +4,11 @@
     "version": "0.1.2",
     "private": true,
     "description": "macOS 桌面屏幕共享 + 虚拟显示器一体工具，主机端 Electron app，观众端浏览器，LAN P2P 推流。DeskPad + Deskreen 思路融合。",
-    "author": "nowo (https://github.com/nowo)",
+    "author": {
+        "name": "nowo",
+        "email": "z8888788@163.com",
+        "url": "https://github.com/nowo"
+    },
     "license": "MIT",
     "homepage": "https://github.com/nowo/desk-share-viewer",
     "repository": {

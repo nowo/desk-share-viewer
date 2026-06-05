@@ -99,10 +99,11 @@ jobs:
           PREV=$(git tag --sort=-version:refname --list 'v*' | grep -vx "$TAG" | head -1 || true)
           rm -f release-notes.md release-changes.md
           if [ -n "$PREV" ]; then
-              pnpm exec changelogen --from "$PREV" --to "$TAG" -o release-changes.md
+              pnpm exec changelogen --from "$PREV" --to "$TAG" -o release-changes.md || true
           else
-              pnpm exec changelogen --to "$TAG" -o release-changes.md
+              pnpm exec changelogen --to "$TAG" -o release-changes.md || true
           fi
+          touch release-changes.md
           {
               cat build/release-header.md
               echo ""
