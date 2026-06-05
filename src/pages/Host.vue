@@ -12,18 +12,41 @@ import { getLanIp, getSignalPort } from '~/utils/bridge'
 
 const router = useRouter()
 
-// 房间号：sessionStorage 持久化（刷新保留，不动 URL —— hash routing 模式下改 hash 会覆盖路由）
+// 房间号：localStorage 持久化（app 重启后保留 —— 观众端可以反复用同一个 URL 访问）
 const ROOM_KEY = 'desk-host-room'
 const initRoomId = (): string => {
-    const stored = sessionStorage.getItem(ROOM_KEY)
+    const stored = localStorage.getItem(ROOM_KEY)
     if (stored && /^\d{6}$/.test(stored)) return stored
     return newRoomId()
 }
 const roomId = ref(initRoomId())
 
 watchEffect(() => {
-    sessionStorage.setItem(ROOM_KEY, roomId.value)
+    localStorage.setItem(ROOM_KEY, roomId.value)
 })
+
+// 房间号输入：用户编辑时的临时值，commit 后才同步到 roomId
+const roomInput = ref(roomId.value)
+watch(roomId, v => { roomInput.value = v })
+// 输入时自动剥离非数字 + 截到 6 位（最简单的输入约束）
+watch(roomInput, v => {
+    const clean = v.replace(/\D/g, '').slice(0, 6)
+    if (clean !== v) roomInput.value = clean
+})
+
+const commitRoom = () => {
+    const v = roomInput.value
+    // 无效或没变 → 恢复显示，不触发任何信令变化
+    if (!/^\d{6}$/.test(v) || v === roomId.value) {
+        roomInput.value = roomId.value
+        return
+    }
+    roomId.value = v
+}
+
+const randomRoom = () => {
+    roomId.value = newRoomId()
+}
 
 // 观众端用浏览器（同 WiFi）访问 http://<lanIp>:1420/#/<roomId>
 const lanIp = ref<string | null>(null)
@@ -53,6 +76,14 @@ const host = useHost(sig)
 const vd = useVirtualDisplay()
 const previewEl = useTemplateRef<HTMLVideoElement>('previewEl')
 
+// 共享中切换房间号：断开旧房间信令，连新房间
+// （未共享时改房间号只更新 URL/QR，不动信令）
+watch(roomId, (newRoom, oldRoom) => {
+    if (newRoom === oldRoom || !host.sharing.value) return
+    sig.close()
+    sig.connect({ room: newRoom, role: 'host' })
+})
+
 const toggleVirtualDisplay = async () => {
     if (vd.info.value) await vd.close()
     else await vd.open()
@@ -69,11 +100,11 @@ watchEffect(() => {
 
 // 画质预设
 const qualityOptions = [
-    { label: '低 (720p / 1.5 Mbps)',   value: 'low' },
-    { label: '中 (1080p / 3 Mbps)',    value: 'medium' },
-    { label: '高 (1080p / 8 Mbps)',    value: 'high' },
+    { label: '低 (720p / 1.5 Mbps)', value: 'low' },
+    { label: '中 (1080p / 3 Mbps)', value: 'medium' },
+    { label: '高 (1080p / 8 Mbps)', value: 'high' },
     { label: '极致 (1440p / 12 Mbps)', value: 'ultra' },
-    { label: '4K (2160p / 20 Mbps)',   value: '4k' },
+    { label: '4K (2160p / 20 Mbps)', value: '4k' },
 ]
 const quality = ref('high')
 watch(quality, async (v) => {
@@ -123,7 +154,7 @@ onBeforeUnmount(() => sig.close())
         <div class="mx-auto max-w-6xl px-4 py-8">
             <div class="mb-6 flex items-center justify-between">
                 <button class="flex items-center gap-1 rounded px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800"
-                        @click="back">
+                    @click="back">
                     <i class="i-mdi-arrow-left" /> 返回
                 </button>
                 <div class="text-sm text-slate-400">{{ host.sharing.value ? '共享中' : '未开始' }}</div>
@@ -137,7 +168,7 @@ onBeforeUnmount(() => sig.close())
                         <div class="flex items-center gap-2">
                             <h3 class="font-bold text-amber-300">虚拟显示器</h3>
                             <span v-if="vd.info.value"
-                                  class="rounded bg-emerald-500/20 px-2 py-0.5 text-xs text-emerald-300">
+                                class="rounded bg-emerald-500/20 px-2 py-0.5 text-xs text-emerald-300">
                                 ON · display_id={{ vd.info.value.display_id }}
                             </span>
                             <span v-else class="rounded bg-slate-700 px-2 py-0.5 text-xs text-slate-400">
@@ -148,7 +179,8 @@ onBeforeUnmount(() => sig.close())
                             创建一块虚拟外接显示器（不可见），可以把其他 app 的窗口拖到这块屏上，再用 OS 屏幕共享时选这块屏即可。DeskPad 同款机制。
                         </p>
                         <p v-else class="mt-1 text-xs text-slate-400">
-                            <strong class="text-amber-300">{{ vd.info.value.name }}</strong>（{{ vd.info.value.width }}×{{ vd.info.value.height }}）已就绪 ——
+                            <strong class="text-amber-300">{{ vd.info.value.name }}</strong>（{{ vd.info.value.width
+                            }}×{{ vd.info.value.height }}）已就绪 ——
                             把要演示的窗口拖到这块屏，然后开始共享屏幕时选「{{ vd.info.value.name }}」
                         </p>
                         <p v-if="vd.error.value" class="mt-2 text-xs text-red-400">
@@ -156,11 +188,11 @@ onBeforeUnmount(() => sig.close())
                         </p>
                     </div>
                     <button :disabled="vd.loading.value"
-                            class="flex items-center gap-1 rounded border px-3 py-1.5 text-sm font-medium transition disabled:opacity-50"
-                            :class="vd.info.value
-                                ? 'border-slate-600 text-slate-300 hover:bg-slate-800'
-                                : 'border-amber-500 text-amber-300 hover:bg-amber-500/10'"
-                            @click="toggleVirtualDisplay">
+                        class="flex items-center gap-1 rounded border px-3 py-1.5 text-sm font-medium transition disabled:opacity-50"
+                        :class="vd.info.value
+                            ? 'border-slate-600 text-slate-300 hover:bg-slate-800'
+                            : 'border-amber-500 text-amber-300 hover:bg-amber-500/10'"
+                        @click="toggleVirtualDisplay">
                         <i :class="vd.info.value ? 'i-mdi-power' : 'i-mdi-plus-circle'" />
                         {{ vd.info.value ? '关闭' : '打开虚拟屏' }}
                     </button>
@@ -170,9 +202,26 @@ onBeforeUnmount(() => sig.close())
             <div v-if="!host.sharing.value" class="rounded-xl border border-slate-700 bg-slate-800/50 p-12 text-center">
                 <i class="i-mdi-monitor mb-4 text-6xl text-sky-400" />
                 <h2 class="mb-2 text-2xl font-bold">准备共享屏幕</h2>
+
+                <!-- 房间号（可编辑，固定后观众端 URL 也固定，下次开 app 不变） -->
+                <div class="mx-auto mb-6 max-w-sm">
+                    <div class="mb-2 text-xs text-slate-500">房间号（观众端 URL 末尾的 6 位）</div>
+                    <div class="flex items-center gap-2">
+                        <input v-model="roomInput" maxlength="6" inputmode="numeric"
+                            class="flex-1 rounded border border-slate-700 bg-slate-900 px-4 py-3 text-center font-mono text-2xl font-bold tracking-widest text-sky-400 outline-none focus:border-sky-500"
+                            @blur="commitRoom" @keydown.enter="commitRoom">
+                        <button
+                            class="rounded border border-slate-700 p-3 text-slate-400 transition hover:bg-slate-800 hover:text-slate-100"
+                            title="随机换一个" @click="randomRoom">
+                            <i class="i-mdi-autorenew" />
+                        </button>
+                    </div>
+                </div>
+
                 <p class="mb-6 text-sm text-slate-400">点击下方按钮选择要共享的屏幕 / 窗口</p>
-                <button class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-6 py-3 text-base font-medium text-white transition hover:bg-emerald-500"
-                        @click="start">
+                <button
+                    class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-6 py-3 text-base font-medium text-white transition hover:bg-emerald-500"
+                    @click="start">
                     <i class="i-mdi-play" />
                     开始共享屏幕
                 </button>
@@ -187,11 +236,15 @@ onBeforeUnmount(() => sig.close())
                         <img v-if="qrDataUrl" :src="qrDataUrl" class="h-56 w-56" alt="QR">
                     </div>
                     <div class="mb-4 flex items-center gap-2">
-                        <code class="flex-1 rounded bg-slate-900 px-4 py-3 text-center font-mono text-3xl font-bold tracking-widest text-sky-400">
-                            {{ roomId }}
-                        </code>
-                        <button class="rounded p-2 text-slate-400 hover:bg-slate-800 hover:text-slate-100"
-                                title="复制房间号" @click="copyRoom">
+                        <input v-model="roomInput" maxlength="6" inputmode="numeric"
+                            class="flex-1 rounded border border-transparent bg-slate-900 px-4 py-3 text-center font-mono text-3xl font-bold tracking-widest text-sky-400 outline-none focus:border-sky-500"
+                            @blur="commitRoom" @keydown.enter="commitRoom">
+                        <button class="rounded p-2 text-slate-400 hover:bg-slate-800 hover:text-slate-100" title="随机换一个"
+                            @click="randomRoom">
+                            <i class="i-mdi-autorenew" />
+                        </button>
+                        <button class="rounded p-2 text-slate-400 hover:bg-slate-800 hover:text-slate-100" title="复制房间号"
+                            @click="copyRoom">
                             <i class="i-mdi-content-copy" />
                         </button>
                     </div>
@@ -201,7 +254,7 @@ onBeforeUnmount(() => sig.close())
                             <div class="mt-1 flex items-center gap-2">
                                 <code class="flex-1 truncate font-mono text-emerald-400">{{ viewerUrl }}</code>
                                 <button class="rounded p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-100"
-                                        title="复制 URL" @click="copyLink">
+                                    title="复制 URL" @click="copyLink">
                                     <i class="i-mdi-content-copy text-xs" />
                                 </button>
                             </div>
@@ -211,7 +264,7 @@ onBeforeUnmount(() => sig.close())
                             <div class="mt-1 flex items-center gap-2">
                                 <code class="flex-1 font-mono text-sky-300">{{ lanIp }}:{{ signalPort }}</code>
                                 <button class="rounded p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-100"
-                                        title="复制" @click="copyHost">
+                                    title="复制" @click="copyHost">
                                     <i class="i-mdi-content-copy text-xs" />
                                 </button>
                             </div>
@@ -224,13 +277,14 @@ onBeforeUnmount(() => sig.close())
                     <div class="mb-3 text-sm text-slate-400">本地预览</div>
                     <div class="relative aspect-video overflow-hidden rounded-lg bg-black">
                         <video ref="previewEl" autoplay muted playsinline
-                               class="absolute inset-0 h-full w-full object-contain" />
+                            class="absolute inset-0 h-full w-full object-contain" />
                         <div v-if="host.trackEnded.value"
-                             class="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/90 p-4 text-center">
+                            class="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/90 p-4 text-center">
                             <i class="i-mdi-alert mb-2 text-3xl text-amber-400" />
                             <div class="mb-3 text-sm">屏幕共享中断</div>
-                            <button class="inline-flex items-center gap-1 rounded bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-500"
-                                    @click="reShare">
+                            <button
+                                class="inline-flex items-center gap-1 rounded bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-500"
+                                @click="reShare">
                                 <i class="i-mdi-refresh" /> 重新选择屏幕
                             </button>
                         </div>
@@ -239,13 +293,15 @@ onBeforeUnmount(() => sig.close())
                     <div class="mt-4 grid grid-cols-2 gap-3 text-sm">
                         <div class="rounded bg-slate-900 px-3 py-2">
                             <div class="text-xs text-slate-500">信令</div>
-                            <div class="font-semibold" :class="sig.connected.value ? 'text-emerald-400' : 'text-amber-400'">
+                            <div class="font-semibold"
+                                :class="sig.connected.value ? 'text-emerald-400' : 'text-amber-400'">
                                 {{ sig.connected.value ? '已连' : '重连中' }}
                             </div>
                         </div>
                         <div class="rounded bg-slate-900 px-3 py-2">
                             <div class="text-xs text-slate-500">观众</div>
-                            <div class="font-semibold" :class="sig.peerJoined.value ? 'text-emerald-400' : 'text-slate-500'">
+                            <div class="font-semibold"
+                                :class="sig.peerJoined.value ? 'text-emerald-400' : 'text-slate-500'">
                                 {{ sig.peerJoined.value ? '在线' : '等待' }}
                             </div>
                         </div>
@@ -259,7 +315,8 @@ onBeforeUnmount(() => sig.close())
                         </div>
                         <div class="col-span-2 rounded bg-slate-900 px-3 py-2">
                             <div class="text-xs text-slate-500">防休眠</div>
-                            <div class="font-semibold" :class="host.sleepLocked.value ? 'text-emerald-400' : 'text-slate-500'">
+                            <div class="font-semibold"
+                                :class="host.sleepLocked.value ? 'text-emerald-400' : 'text-slate-500'">
                                 {{ host.sleepLocked.value ? '已锁' : '未锁' }}
                             </div>
                         </div>
@@ -269,18 +326,20 @@ onBeforeUnmount(() => sig.close())
                     <div class="mt-4 flex items-center gap-2">
                         <label class="text-sm text-slate-400">画质</label>
                         <select v-model="quality"
-                                class="flex-1 rounded border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-sky-500">
+                            class="flex-1 rounded border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-sky-500">
                             <option v-for="o in qualityOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
                         </select>
                     </div>
 
                     <div class="mt-3 flex gap-2">
-                        <button class="flex flex-1 items-center justify-center gap-1 rounded border border-slate-600 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800"
-                                @click="reShare">
+                        <button
+                            class="flex flex-1 items-center justify-center gap-1 rounded border border-slate-600 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800"
+                            @click="reShare">
                             <i class="i-mdi-refresh" /> 重新选屏
                         </button>
-                        <button class="flex flex-1 items-center justify-center gap-1 rounded bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-500"
-                                @click="stop">
+                        <button
+                            class="flex flex-1 items-center justify-center gap-1 rounded bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-500"
+                            @click="stop">
                             <i class="i-mdi-stop" /> 停止共享
                         </button>
                     </div>
@@ -291,9 +350,7 @@ onBeforeUnmount(() => sig.close())
         </div>
 
         <!-- 源选择 picker -->
-        <SourcePicker v-if="pickerOpen"
-                      :virtual-display-id="vd.info.value?.display_id ?? null"
-                      @pick="onSourcePicked"
-                      @cancel="pickerOpen = false" />
+        <SourcePicker v-if="pickerOpen" :virtual-display-id="vd.info.value?.display_id ?? null" @pick="onSourcePicked"
+            @cancel="pickerOpen = false" />
     </div>
 </template>
