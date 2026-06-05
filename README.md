@@ -6,7 +6,27 @@
 
 macOS 桌面屏幕共享 + 虚拟显示器一体工具。主机端跑桌面应用，观众端用浏览器看，全程 LAN 内 P2P 推流，开箱即用，无需登录、无需后端、无需第三方信令服务。
 
-> **致敬 [DeskPad](https://github.com/Stengo/DeskPad) 和 [Deskreen](https://github.com/pavlobu/deskreen)** —— 虚拟显示器调用 SkyLight 私有 API 的方法来自 DeskPad；6 位房间号 + WebRTC LAN 推流的思路借鉴 Deskreen。
+## 💡 为什么写这个？
+
+平时主力机是工作电脑，桌上还闲置着一台一体机想利用起来当辅助屏 —— 但这台一体机**没有 HDMI 输入接口**，没法当外接显示器接进主力机。
+
+后来摸索出一套现成组合方案：
+
+| 组件 | 项目 | 作用 |
+|---|---|---|
+| 虚拟显示器 | [DeskPad](https://github.com/Stengo/DeskPad) | 在 macOS 创建一块虚拟屏，可以把窗口拖进去 |
+| 屏幕推流 | [Deskreen](https://github.com/pavlobu/deskreen) | 把这块虚拟屏通过 LAN 推到一体机浏览器里显示 |
+
+基本能用，但持续用下来碰到一个挺打断节奏的问题：
+
+> **去吃饭、中午休息会将主力机锁屏，一段时间后再回来用，Deskreen 经常需要重新连接** —— 每次都得手动跑去一体机点浏览器、刷新页面、重开 URL，体感很碎。
+
+于是写了 desk-share-viewer，把这两件事**合在一个桌面 app 里**，同时把"自动恢复"做厚一点：
+
+- 🧩 虚拟显示器走 SkyLight 私有 API（DeskPad 同款机制）
+- 📡 LAN P2P 推流走 WebRTC（Deskreen 同款思路，独立实现）
+- 🔢 **房间号可固定**（六位数字，本地持久化）—— 一体机浏览器存个书签反复用，URL 一直不变
+- 🔁 **信令断线自动指数退避重连 + WebRTC ICE restart** —— 主力机睡醒后大概率能自愈，不用手动重连
 
 ## ✨ 特性
 
