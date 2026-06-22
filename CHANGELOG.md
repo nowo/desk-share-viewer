@@ -1,6 +1,23 @@
 # Changelog
 
 
+## v0.1.4
+
+[compare changes](https://github.com/nowo/desk-share-viewer/compare/v0.1.3...v0.1.4)
+
+### 🚀 Enhancements
+
+- **zoom:** 本地预览与观众端放大查看，主机可控制观众是否允许放大 ([60c50e4](https://github.com/nowo/desk-share-viewer/commit/60c50e4))
+- **update:** 轻量检查更新，查 GitHub Release 有新版提示跳转下载 ([6581241](https://github.com/nowo/desk-share-viewer/commit/6581241))
+
+### 🏡 Chore
+
+- **release:** Pnpm release 加 --no-github，避免和 CI 创建 release 重复 ([c9cfede](https://github.com/nowo/desk-share-viewer/commit/c9cfede))
+
+### ❤️ Contributors
+
+- Nowo ([@nowo](https://github.com/nowo))
+
 ## v0.1.3
 
 [compare changes](https://github.com/nowo/desk-share-viewer/compare/v0.1.2...v0.1.3)
