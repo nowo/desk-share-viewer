@@ -12,6 +12,7 @@ import { app, BrowserWindow, desktopCapturer, ipcMain, Menu, screen, shell } fro
 import { startSignaling } from './signaling'
 import { allowSleep, preventSleep } from './sleep-lock'
 import { startStaticServer } from './static-server'
+import { checkForUpdate } from './updater'
 import {
     closeVirtualDisplay,
     isVirtualDisplaySupported,
@@ -51,6 +52,7 @@ function registerIpc() {
     ipcMain.handle('open-in-browser', async (_e, url: string) => {
         await shell.openExternal(url)
     })
+    ipcMain.handle('update:check', () => checkForUpdate())
 
     ipcMain.handle('virtual-display:supported', () => isVirtualDisplaySupported())
     ipcMain.handle('virtual-display:open', async (_e, opts: OpenOpts): Promise<DisplayInfo> => {
@@ -120,14 +122,16 @@ function buildAppMenu() {
     const isZh = app.getLocale().startsWith('zh')
     const appName = isZh ? '桌面共享' : 'desk share viewer'
     const tr = isZh
-        ? { about: '关于', hide: '隐藏', hideOthers: '隐藏其他', showAll: '全部显示', quit: '退出', services: '服务', preferences: '偏好设置' }
-        : { about: 'About', hide: 'Hide', hideOthers: 'Hide Others', showAll: 'Show All', quit: 'Quit', services: 'Services', preferences: 'Preferences' }
+        ? { about: '关于', hide: '隐藏', hideOthers: '隐藏其他', showAll: '全部显示', quit: '退出', services: '服务', preferences: '偏好设置', checkUpdate: '检查更新…' }
+        : { about: 'About', hide: 'Hide', hideOthers: 'Hide Others', showAll: 'Show All', quit: 'Quit', services: 'Services', preferences: 'Preferences', checkUpdate: 'Check for Updates…' }
 
     const template: Electron.MenuItemConstructorOptions[] = [
         {
             label: appName,
             submenu: [
                 { label: `${tr.about} ${appName}`, role: 'about' },
+                { type: 'separator' },
+                { label: tr.checkUpdate, click: () => mainWindow?.webContents.send('update:menu-check') },
                 { type: 'separator' },
                 { label: tr.services, role: 'services', submenu: [] },
                 { type: 'separator' },

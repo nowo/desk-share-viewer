@@ -1,12 +1,23 @@
 // Electron IPC bridge —— 通过 preload 暴露的 window.desk.* 调主进程
 // 浏览器环境（观众端）下走 fallback：返回默认值或 hostname
 
+export interface UpdateResult {
+    hasUpdate: boolean
+    currentVersion: string
+    latestVersion?: string
+    releaseUrl?: string
+    notes?: string
+    error?: string
+}
+
 interface DeskApi {
     getLanIp: () => Promise<string | null>
     getSignalPort: () => Promise<number>
     preventSleep: () => Promise<boolean>
     allowSleep: () => Promise<void>
     openInBrowser: (url: string) => Promise<void>
+    checkForUpdate: () => Promise<UpdateResult>
+    onMenuCheckUpdate: (cb: () => void) => () => void
     virtualDisplaySupported: () => Promise<boolean>
     openVirtualDisplay: (opts?: { width?: number, height?: number, hz?: number, name?: string }) => Promise<{
         display_id: number
@@ -54,4 +65,15 @@ export const openInBrowser = async (url: string): Promise<void> => {
         return
     }
     return window.desk!.openInBrowser(url)
+}
+
+// 观众端（浏览器）没有「更新」概念，直接返回无更新
+export const checkForUpdate = async (): Promise<UpdateResult> => {
+    if (!inElectron()) return { hasUpdate: false, currentVersion: '' }
+    return window.desk!.checkForUpdate()
+}
+
+export const onMenuCheckUpdate = (cb: () => void): (() => void) => {
+    if (!inElectron()) return () => {}
+    return window.desk!.onMenuCheckUpdate(cb)
 }

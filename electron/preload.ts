@@ -7,6 +7,20 @@ const api = {
     preventSleep: () => ipcRenderer.invoke('prevent-sleep') as Promise<boolean>,
     allowSleep: () => ipcRenderer.invoke('allow-sleep') as Promise<void>,
     openInBrowser: (url: string) => ipcRenderer.invoke('open-in-browser', url) as Promise<void>,
+    checkForUpdate: () => ipcRenderer.invoke('update:check') as Promise<{
+        hasUpdate: boolean
+        currentVersion: string
+        latestVersion?: string
+        releaseUrl?: string
+        notes?: string
+        error?: string
+    }>,
+    // 菜单「检查更新…」触发，返回取消订阅函数
+    onMenuCheckUpdate: (cb: () => void) => {
+        const listener = (): void => cb()
+        ipcRenderer.on('update:menu-check', listener)
+        return () => ipcRenderer.removeListener('update:menu-check', listener)
+    },
     virtualDisplaySupported: () => ipcRenderer.invoke('virtual-display:supported') as Promise<boolean>,
     openVirtualDisplay: (opts?: { width?: number, height?: number, hz?: number, name?: string }) =>
         ipcRenderer.invoke('virtual-display:open', opts || {}) as Promise<{

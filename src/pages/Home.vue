@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useUpdate } from '~/composables/useUpdate'
 
 const router = useRouter()
 const inputRoom = ref('')
@@ -10,6 +11,9 @@ const canJoin = computed(() => /^\d{6}$/.test(inputRoom.value.trim()))
 const goViewer = () => {
     if (canJoin.value) router.push(`/viewer/${inputRoom.value.trim()}`)
 }
+
+const update = useUpdate()
+const currentVersion = computed(() => update.result.value?.currentVersion)
 </script>
 
 <template>
@@ -73,6 +77,15 @@ const goViewer = () => {
                     <li>macOS 虚拟显示器（SkyLight 私有 API，DeskPad 等价物）</li>
                     <li>观众端浏览器直连：扫 QR / 输入 6 位房间号即入</li>
                 </ul>
+            </div>
+
+            <div class="text-xs text-slate-500 mt-8 flex gap-3 items-center">
+                <span v-if="currentVersion" class="font-mono">v{{ currentVersion }}</span>
+                <button class="text-slate-400 px-2 py-1 rounded inline-flex gap-1 transition items-center hover:text-slate-200 hover:bg-slate-800 disabled:opacity-50"
+                    :disabled="update.checking.value" @click="update.check()">
+                    <i class="i-mdi-refresh" :class="{ 'animate-spin': update.checking.value }" />
+                    {{ update.checking.value ? '检查中…' : '检查更新' }}
+                </button>
             </div>
         </div>
     </div>
