@@ -2,10 +2,11 @@
 // 客户端 → 服务器:
 //   { type: 'join', room, role: 'host' | 'viewer' }
 //   { type: 'offer'|'answer'|'ice', ... }
+//   { type: 'control', allowZoom } (主机下发观众端能力开关)
 //   { type: 'ping' }
 // 服务器 → 客户端:
 //   { type: 'joined'|'peer-join'|'peer-leave'|'kicked'|'error'|'pong' }
-//   { type: 'offer'|'answer'|'ice' } (透传)
+//   { type: 'offer'|'answer'|'ice'|'control' } (透传)
 import { WebSocket, WebSocketServer } from 'ws'
 
 type Role = 'host' | 'viewer'
@@ -90,8 +91,8 @@ export function startSignaling(port: number): WebSocketServer {
                 return
             }
 
-            // offer / answer / ice 透传
-            if (msg.type === 'offer' || msg.type === 'answer' || msg.type === 'ice') {
+            // offer / answer / ice / control 透传
+            if (msg.type === 'offer' || msg.type === 'answer' || msg.type === 'ice' || msg.type === 'control') {
                 const found = findPeer(sock)
                 if (!found) {
                     safeSend(sock, { type: 'error', message: 'not in any room' })

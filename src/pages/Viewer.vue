@@ -1,8 +1,9 @@
 <script lang="ts" setup>
 // 观众端：全屏视频 + 状态浮层
 // signal host 直接用 window.location.hostname（URL 里的 IP / 域名）
-import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef, watchEffect } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef, watch, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { usePanZoom } from '~/composables/usePanZoom'
 import { useSignaling } from '~/composables/useSignaling'
 import { useViewer } from '~/composables/useViewer'
 
@@ -13,6 +14,23 @@ const roomId = computed(() => String(route.params.roomId || ''))
 const sig = useSignaling()
 const viewer = useViewer(sig)
 const videoEl = useTemplateRef<HTMLVideoElement>('videoEl')
+
+// 放大：是否允许由主机通过信令 control 消息下发，默认不允许
+const allowZoom = ref(false)
+const pz = usePanZoom()
+sig.onMessage((m) => {
+    if (m.type === 'control' && typeof m.allowZoom === 'boolean') {
+        allowZoom.value = m.allowZoom
+    }
+})
+// 主机收回权限时复位缩放，避免观众停留在放大状态
+watch(allowZoom, (v) => {
+    if (!v) pz.reset()
+})
+
+// 仅在允许时响应缩放/平移
+const onWheel = (e: WheelEvent) => allowZoom.value && pz.onWheel(e)
+const onPointerDown = (e: PointerEvent) => allowZoom.value && pz.onPointerDown(e)
 
 watchEffect(() => {
     if (videoEl.value && viewer.remoteStream.value) {
@@ -63,6 +81,9 @@ const hasStream = computed(() => !!viewer.remoteStream.value)
         <!-- muted 是为了通过浏览器自动播放策略；流本身无音轨，加 muted 无副作用 -->
         <video ref="videoEl" autoplay muted playsinline
             class="h-full w-full inset-0 absolute object-contain"
+            :style="{ transform: pz.transform.value, cursor: allowZoom ? pz.cursor.value : undefined, transition: pz.dragging.value ? 'none' : 'transform 0.1s ease-out' }"
+            @wheel="onWheel" @pointerdown="onPointerDown" @pointermove="pz.onPointerMove"
+            @pointerup="pz.onPointerUp" @pointercancel="pz.onPointerUp"
             @dblclick="toggleFullscreen" />
 
         <!-- 顶部控制条 -->
@@ -77,6 +98,21 @@ const hasStream = computed(() => !!viewer.remoteStream.value)
             </div>
             <button class="text-slate-300 p-2 rounded hover:bg-white/10" @click="toggleFullscreen">
                 <i class="i-mdi-fullscreen" />
+            </button>
+        </div>
+
+        <!-- 缩放工具栏：仅主机允许放大时显示 -->
+        <div v-if="allowZoom && hasStream && showControls"
+            class="px-3 py-2 rounded-full bg-black/60 flex gap-1 items-center bottom-6 left-1/2 absolute z-10 backdrop-blur -translate-x-1/2">
+            <button class="text-slate-200 p-2 rounded-full transition hover:bg-white/10" title="缩小" @click="pz.zoomOut">
+                <i class="i-mdi-magnify-minus-outline text-lg" />
+            </button>
+            <span class="text-sm text-slate-200 font-mono px-2 text-center w-14 tabular-nums">{{ Math.round(pz.scale.value * 100) }}%</span>
+            <button class="text-slate-200 p-2 rounded-full transition hover:bg-white/10" title="放大" @click="pz.zoomIn">
+                <i class="i-mdi-magnify-plus-outline text-lg" />
+            </button>
+            <button class="text-slate-200 p-2 rounded-full transition hover:bg-white/10" title="重置" @click="pz.reset">
+                <i class="i-mdi-restore text-lg" />
             </button>
         </div>
 

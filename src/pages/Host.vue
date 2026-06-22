@@ -5,6 +5,7 @@ import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef, watch, watch
 import { useRouter } from 'vue-router'
 import SourcePicker from '~/components/SourcePicker.vue'
 import { useHost } from '~/composables/useHost'
+import { usePanZoom } from '~/composables/usePanZoom'
 import { useSignaling } from '~/composables/useSignaling'
 import { useVirtualDisplay } from '~/composables/useVirtualDisplay'
 import { getLanIp, getSignalPort } from '~/utils/bridge'
@@ -78,6 +79,41 @@ const sig = useSignaling()
 const host = useHost(sig)
 const vd = useVirtualDisplay()
 const previewEl = useTemplateRef<HTMLVideoElement>('previewEl')
+
+// 放大查看：弹出全屏覆盖层，绑定同一路 stream，支持滚轮缩放 + 拖拽平移
+const zoomOpen = ref(false)
+const zoomEl = useTemplateRef<HTMLVideoElement>('zoomEl')
+const pz = usePanZoom()
+
+const openZoom = () => {
+    pz.reset()
+    zoomOpen.value = true
+}
+const closeZoom = () => {
+    zoomOpen.value = false
+}
+
+// 模态打开后把同一路 stream 喂给放大的 video
+watchEffect(() => {
+    if (zoomEl.value && host.stream.value) {
+        zoomEl.value.srcObject = host.stream.value
+    }
+})
+
+// 允许观众放大：默认开，通过信令下发给观众端
+const ZOOM_PERM_KEY = 'desk-host-allow-viewer-zoom'
+const allowViewerZoom = ref(localStorage.getItem(ZOOM_PERM_KEY) !== '0')
+const sendZoomPermission = () => {
+    sig.send({ type: 'control', allowZoom: allowViewerZoom.value })
+}
+watch(allowViewerZoom, (v) => {
+    localStorage.setItem(ZOOM_PERM_KEY, v ? '1' : '0')
+    sendZoomPermission()
+})
+// 观众加入时把当前权限补发一次（覆盖晚加入的观众）
+watch(() => sig.peerJoined.value, (joined) => {
+    if (joined) sendZoomPermission()
+})
 
 // 共享中切换房间号：断开旧房间信令，连新房间
 // （未共享时改房间号只更新 URL/QR，不动信令）
@@ -158,7 +194,14 @@ const fmtState = (s: string): string => ({
     completed: '完成',
 } as Record<string, string>)[s] || s
 
-onBeforeUnmount(() => sig.close())
+const onKeydown = (e: KeyboardEvent) => {
+    if (e.key === 'Escape' && zoomOpen.value) closeZoom()
+}
+onMounted(() => window.addEventListener('keydown', onKeydown))
+onBeforeUnmount(() => {
+    window.removeEventListener('keydown', onKeydown)
+    sig.close()
+})
 </script>
 
 <template>
@@ -309,6 +352,11 @@ onBeforeUnmount(() => sig.close())
                     <div class="rounded-lg bg-black aspect-video relative overflow-hidden">
                         <video ref="previewEl" autoplay muted playsinline
                             class="h-full w-full inset-0 absolute object-contain" />
+                        <button v-if="!host.trackEnded.value"
+                            class="text-white p-2 rounded-lg bg-black/50 transition right-2 top-2 absolute backdrop-blur hover:bg-black/70"
+                            title="放大查看" @click="openZoom">
+                            <i class="i-mdi-magnify-plus-outline text-lg" />
+                        </button>
                         <div v-if="host.trackEnded.value"
                             class="p-4 text-center bg-slate-900/90 flex flex-col items-center inset-0 justify-center absolute">
                             <i class="i-mdi-alert text-3xl text-amber-400 mb-2" />
@@ -379,6 +427,14 @@ onBeforeUnmount(() => sig.close())
                         </select>
                     </div>
 
+                    <!-- 允许观众放大 -->
+                    <label class="text-sm text-slate-400 mt-3 flex gap-2 cursor-pointer select-none items-center">
+                        <input v-model="allowViewerZoom" type="checkbox"
+                            class="accent-sky-500 rounded bg-slate-900 h-4 w-4">
+                        允许观众放大画面
+                        <span class="text-xs text-slate-500">（关闭后观众端只能整屏查看）</span>
+                    </label>
+
                     <div class="mt-3 flex gap-2">
                         <button class="text-sm text-slate-300 px-3 py-2 border border-slate-600 rounded flex flex-1 gap-1 items-center justify-center hover:bg-slate-800"
                             @click="reShare">
@@ -400,5 +456,35 @@ onBeforeUnmount(() => sig.close())
         <!-- 源选择 picker -->
         <SourcePicker v-if="pickerOpen" :virtual-display-id="vd.info.value?.display_id ?? null" @pick="onSourcePicked"
             @cancel="pickerOpen = false" />
+
+        <!-- 放大查看：全屏覆盖层，滚轮缩放 + 拖拽平移 -->
+        <div v-if="zoomOpen"
+            class="bg-black/95 flex items-center inset-0 justify-center fixed z-50"
+            @click.self="closeZoom">
+            <video ref="zoomEl" autoplay muted playsinline
+                class="max-h-full max-w-full select-none"
+                :style="{ transform: pz.transform.value, cursor: pz.cursor.value, transition: pz.dragging.value ? 'none' : 'transform 0.1s ease-out' }"
+                @wheel="pz.onWheel" @pointerdown="pz.onPointerDown" @pointermove="pz.onPointerMove"
+                @pointerup="pz.onPointerUp" @pointercancel="pz.onPointerUp" @dblclick="pz.reset" />
+
+            <!-- 工具栏 -->
+            <div class="px-3 py-2 rounded-full bg-slate-800/90 flex gap-1 items-center bottom-6 left-1/2 fixed backdrop-blur -translate-x-1/2"
+                @click.stop>
+                <button class="text-slate-200 p-2 rounded-full transition hover:bg-slate-700" title="缩小" @click="pz.zoomOut">
+                    <i class="i-mdi-magnify-minus-outline text-lg" />
+                </button>
+                <span class="text-sm text-slate-300 font-mono px-2 text-center w-14 tabular-nums">{{ Math.round(pz.scale.value * 100) }}%</span>
+                <button class="text-slate-200 p-2 rounded-full transition hover:bg-slate-700" title="放大" @click="pz.zoomIn">
+                    <i class="i-mdi-magnify-plus-outline text-lg" />
+                </button>
+                <button class="text-slate-200 p-2 rounded-full transition hover:bg-slate-700" title="重置" @click="pz.reset">
+                    <i class="i-mdi-restore text-lg" />
+                </button>
+                <div class="mx-1 bg-slate-600 h-5 w-px" />
+                <button class="text-slate-200 p-2 rounded-full transition hover:bg-slate-700" title="关闭 (Esc)" @click="closeZoom">
+                    <i class="i-mdi-close text-lg" />
+                </button>
+            </div>
+        </div>
     </div>
 </template>
