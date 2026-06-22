@@ -53,10 +53,12 @@ const config: Configuration = {
         title: '${productName} ${version} ${arch}', // 加 arch 避免双架构串行打包撞 /Volumes mount 点
         icon: 'build/icon.icns',
         background: 'build/dmg-background.png',
-        window: { width: 540, height: 380 },
+        window: { width: 540, height: 460 },
         contents: [
-            { x: 140, y: 200, type: 'file' },
-            { x: 400, y: 200, type: 'link', path: '/Applications' },
+            { x: 140, y: 210, type: 'file' },
+            { x: 400, y: 210, type: 'link', path: '/Applications' },
+            // 解除隔离的小助手：ad-hoc 签名下新版 macOS 会误报「已损坏」，双击它自动 xattr -cr
+            { x: 270, y: 360, type: 'file', path: 'build/首次打开.command' },
         ],
     },
 
