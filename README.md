@@ -27,6 +27,7 @@
 - 📡 LAN P2P 推流走 WebRTC（Deskreen 同款思路，独立实现）
 - 🔢 **房间号可固定**（六位数字，本地持久化）—— 一体机浏览器存个书签反复用，URL 一直不变
 - 🔁 **信令断线自动指数退避重连 + WebRTC ICE restart** —— 主力机睡醒后大概率能自愈，不用手动重连
+- 🟡 **锁屏期间观众端有明确反馈** —— 主力机锁屏 / 熄屏时观众端不再是莫名定格，而是浮出「画面已暂停，恢复后自动继续」，解锁后画面自动接回
 
 ## ✨ 特性
 
@@ -34,7 +35,7 @@
 - 📡 **WebRTC P2P 推流** —— 端到端直传，画质码率可调（720p / 1080p / 1440p / 4K）
 - 🌐 **内置 LAN 信令 + 静态 server** —— 主机起来后，同 WiFi 任意设备浏览器输 URL 就能加入
 - 🔢 **6 位数字房间号 + QR 码** —— 手机扫一扫即入
-- 🔁 **断线自恢复** —— WebSocket 指数退避重连 + ICE restart + replaceTrack 换屏不掉房间
+- 🔁 **断线自恢复 + 状态反馈** —— WebSocket 指数退避重连 + ICE restart + replaceTrack 换屏不掉房间；观众端能识别主机**锁屏 / 熄屏**（提示「画面已暂停，恢复后自动继续」）与**主机离开**（提示「等待重连」），不再是无声定格
 - 💤 **共享期防休眠** —— Electron powerSaveBlocker
 - 🌏 **中英文** —— 菜单栏跟随系统语言切换
 - 🪟 **跨端主机** —— macOS / Windows / Linux 都能跑（虚拟显示器仅 macOS）
@@ -195,7 +196,7 @@ runtime deps 只有 4 个：`vue` / `vue-router` / `qrcode` / `ws`。包体 ~100
 ## 🤝 致谢
 
 - [DeskPad](https://github.com/Stengo/DeskPad) by Stengo —— 虚拟显示器调 SkyLight 私有 API 的接法是从这学的（MIT）
-- [Deskreen](https://github.com/pavlobu/deskreen) by pavlobu —— 房间号 + WebRTC LAN 推流的设计灵感（AGPL）—— **本项目未直接复用其代码**
+- [Deskreen](https://github.com/pavlobu/deskreen) by pavlobu —— 房间号 + WebRTC LAN 推流的设计灵感（AGPL）
 - [iconify-mdi](https://icon-sets.iconify.design/mdi/) —— 图标
 - Electron / Vue / WebRTC / UnoCSS 生态
 
