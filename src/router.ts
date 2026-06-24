@@ -1,8 +1,10 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import { isElectron } from '~/utils/bridge'
 import Home from './pages/Home.vue'
-import Host from './pages/Host.vue'
-import Viewer from './pages/Viewer.vue'
+
+// Host / Viewer 懒加载：观众端浏览器只用 Viewer，不必下载 Host（含 qrcode 等主机专用依赖）
+const Host = () => import('./pages/Host.vue')
+const Viewer = () => import('./pages/Viewer.vue')
 
 const router = createRouter({
     history: createWebHashHistory(),
