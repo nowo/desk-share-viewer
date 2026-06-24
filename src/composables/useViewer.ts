@@ -1,16 +1,11 @@
 import type { Signaling } from './useSignaling'
 // 观众端：接收 offer，回 answer
 import { onBeforeUnmount, ref } from 'vue'
-
-const ICE_SERVERS: RTCIceServer[] = [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-]
+import { ICE_SERVERS } from '~/utils/webrtc'
 
 export const useViewer = (signaling: Signaling) => {
     const remoteStream = ref<MediaStream | null>(null)
     const connectionState = ref<RTCPeerConnectionState>('new')
-    const iceState = ref<RTCIceConnectionState>('new')
     const error = ref<string | null>(null)
     // 主机画面是否暂停出帧（主机锁屏 / 熄屏时屏幕采集被系统暂停 → track mute）
     const videoPaused = ref(false)
@@ -25,7 +20,6 @@ export const useViewer = (signaling: Signaling) => {
             if (e.candidate) signaling.send({ type: 'ice', candidate: e.candidate.toJSON() })
         }
         conn.onconnectionstatechange = () => (connectionState.value = conn.connectionState)
-        conn.oniceconnectionstatechange = () => (iceState.value = conn.iceConnectionState)
         conn.ontrack = (e) => {
             remoteStream.value = e.streams[0] || new MediaStream([e.track])
             // 监听帧暂停/恢复：主机锁屏熄屏会让 track mute，解锁后 unmute 自动恢复
@@ -66,7 +60,6 @@ export const useViewer = (signaling: Signaling) => {
         pc = null
         remoteStream.value = null
         connectionState.value = 'closed'
-        iceState.value = 'closed'
         videoPaused.value = false
     }
 
@@ -86,5 +79,5 @@ export const useViewer = (signaling: Signaling) => {
 
     onBeforeUnmount(reset)
 
-    return { remoteStream, connectionState, iceState, error, videoPaused, reset }
+    return { remoteStream, connectionState, error, videoPaused }
 }

@@ -1,5 +1,6 @@
 // 虚拟显示器（desk-display sidecar）控制
 import { onMounted, ref } from 'vue'
+import { isElectron } from '~/utils/bridge'
 
 export interface IDisplayInfo {
     display_id: number
@@ -15,8 +16,6 @@ export interface IOpenOpts {
     name?: string
 }
 
-const inElectron = () => typeof window !== 'undefined' && !!(window as any).desk
-
 export const useVirtualDisplay = () => {
     const info = ref<IDisplayInfo | null>(null)
     const loading = ref(false)
@@ -25,7 +24,7 @@ export const useVirtualDisplay = () => {
     const supported = ref(false)
 
     const refresh = async () => {
-        if (!inElectron()) return
+        if (!isElectron()) return
         supported.value = await (window as any).desk.virtualDisplaySupported() as boolean
         if (!supported.value) return
         const active = await (window as any).desk.virtualDisplayStatus() as boolean
@@ -33,7 +32,7 @@ export const useVirtualDisplay = () => {
     }
 
     const open = async (opts: IOpenOpts = {}) => {
-        if (!inElectron()) {
+        if (!isElectron()) {
             error.value = '此功能仅在 desk 桌面应用内可用'
             return
         }
@@ -50,7 +49,7 @@ export const useVirtualDisplay = () => {
     }
 
     const close = async () => {
-        if (!inElectron()) return
+        if (!isElectron()) return
         loading.value = true
         try {
             await (window as any).desk.closeVirtualDisplay()

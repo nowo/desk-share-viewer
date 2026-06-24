@@ -13,7 +13,6 @@ export const useSignaling = () => {
     const ws = ref<WebSocket | null>(null)
     const connected = ref(false)
     const peerJoined = ref(false)
-    const lastError = ref<string | null>(null)
 
     let currentRoom: string | null = null
     let currentRole: Role | null = null
@@ -21,7 +20,6 @@ export const useSignaling = () => {
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null
     let pingTimer: ReturnType<typeof setInterval> | null = null
     let manualClose = false
-    let signalHost: string | null = null
     const handlers = new Set<(m: ISignalMsg) => void>()
     // 发送队列：WS 还没 open 时缓存消息，open 后一起 flush
     // 修 bug：首次共享时 startShare 内部 sendOffer 在 sig.connect 之前触发，
@@ -31,13 +29,9 @@ export const useSignaling = () => {
 
     const buildUrl = async (): Promise<string> => {
         const port = await getSignalPort()
-        // 优先用显式传入的 host，否则用当前 hostname（观众端浏览器场景）
-        const host = signalHost || window.location.hostname || '127.0.0.1'
+        // 主机端 file:// 下 hostname 为空 → 回退 127.0.0.1；观众端用 URL 里的 host
+        const host = window.location.hostname || '127.0.0.1'
         return `ws://${host}:${port}/signal`
-    }
-
-    const setSignalHost = (h: string) => {
-        signalHost = h
     }
 
     const send = (msg: ISignalMsg) => {
@@ -69,7 +63,6 @@ export const useSignaling = () => {
 
         sock.onopen = () => {
             connected.value = true
-            lastError.value = null
             reconnectAttempt = 0
             startPing()
             // join 必须最先发（服务器据此把这条连接绑到房间）
@@ -93,7 +86,6 @@ export const useSignaling = () => {
             if (msg.type === 'pong') return
             if (msg.type === 'peer-join') peerJoined.value = true
             if (msg.type === 'peer-leave') peerJoined.value = false
-            if (msg.type === 'error') lastError.value = msg.message
             handlers.forEach(h => h(msg))
         }
 
@@ -102,10 +94,6 @@ export const useSignaling = () => {
             stopPing()
             ws.value = null
             scheduleReconnect()
-        }
-
-        sock.onerror = () => {
-            lastError.value = 'WebSocket 错误'
         }
     }
 
@@ -120,10 +108,9 @@ export const useSignaling = () => {
         }, delay)
     }
 
-    const connect = (opts: { room: string, role: Role, signalHost?: string }) => {
+    const connect = (opts: { room: string, role: Role }) => {
         currentRoom = opts.room
         currentRole = opts.role
-        if (opts.signalHost) signalHost = opts.signalHost
         void open()
     }
 
@@ -146,7 +133,7 @@ export const useSignaling = () => {
         return () => handlers.delete(fn)
     }
 
-    return { connected, peerJoined, lastError, connect, close, send, onMessage, setSignalHost }
+    return { connected, peerJoined, connect, close, send, onMessage }
 }
 
 export type Signaling = ReturnType<typeof useSignaling>

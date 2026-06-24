@@ -2,11 +2,7 @@ import type { Signaling } from './useSignaling'
 // 主机端：抓屏 + WebRTC + replaceTrack + ICE restart + Mac 防休眠
 import { onBeforeUnmount, ref } from 'vue'
 import { allowSleep, preventSleep } from '~/utils/bridge'
-
-const ICE_SERVERS: RTCIceServer[] = [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-]
+import { ICE_SERVERS } from '~/utils/webrtc'
 
 // 画质预设 —— LAN 直连建议 high，跨网络可降到 medium
 export interface QualityPreset {
