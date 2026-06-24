@@ -1,6 +1,32 @@
 # Changelog
 
 
+## v0.1.5
+
+[compare changes](https://github.com/nowo/desk-share-viewer/compare/v0.1.4...v0.1.5)
+
+### 🚀 Enhancements
+
+- **port:** 生产环境端口被占用时自动顺延，避免与用户已有服务冲突 ([4a9b8ff](https://github.com/nowo/desk-share-viewer/commit/4a9b8ff))
+- **viewer:** 浏览器观众端隐藏主机入口并拦截 /host 路由 ([5ccd12d](https://github.com/nowo/desk-share-viewer/commit/5ccd12d))
+- **host:** 一键复制二维码卡片，合成含房间号+网址的图片发给朋友 ([3ad8484](https://github.com/nowo/desk-share-viewer/commit/3ad8484))
+
+### 🔥 Performance
+
+- **router:** Host/Viewer 路由懒加载，观众端不再下载主机专用代码 ([dd9b053](https://github.com/nowo/desk-share-viewer/commit/dd9b053))
+
+### 🩹 Fixes
+
+- **zoom:** 主机本地预览放大时若共享中断自动退出放大模式 ([e1297b2](https://github.com/nowo/desk-share-viewer/commit/e1297b2))
+
+### 📦 Build
+
+- **dmg:** 内置「首次打开」助手脚本自动解除 Gatekeeper 隔离 ([f4a2888](https://github.com/nowo/desk-share-viewer/commit/f4a2888))
+
+### ❤️ Contributors
+
+- Nowo ([@nowo](https://github.com/nowo))
+
 ## v0.1.4
 
 [compare changes](https://github.com/nowo/desk-share-viewer/compare/v0.1.3...v0.1.4)
