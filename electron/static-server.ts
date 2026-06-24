@@ -44,8 +44,8 @@ export function startStaticServer(rootDir: string, port: number, signalPort: num
                 return
             }
             const filePath = path.join(rootDir, reqPath)
-            // 防 path traversal
-            if (!filePath.startsWith(rootDir)) {
+            // 防 path traversal：必须严格落在 rootDir 目录内（带分隔符避免 /dist 命中 /dist-evil）
+            if (!filePath.startsWith(rootDir + path.sep)) {
                 res.writeHead(403)
                 res.end('forbidden')
                 return

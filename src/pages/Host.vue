@@ -278,6 +278,7 @@ const onKeydown = (e: KeyboardEvent) => {
 onMounted(() => window.addEventListener('keydown', onKeydown))
 onBeforeUnmount(() => {
     window.removeEventListener('keydown', onKeydown)
+    if (hintTimer) clearTimeout(hintTimer)
     sig.close()
 })
 </script>
@@ -350,8 +351,7 @@ onBeforeUnmount(() => {
                         <input v-model="roomInput" maxlength="6" inputmode="numeric"
                             class="text-2xl text-sky-400 tracking-widest font-bold font-mono px-4 py-3 text-center outline-none border border-slate-700 rounded bg-slate-900 flex-1 focus:border-sky-500"
                             @blur="commitRoom" @keydown.enter="commitRoom">
-                        <button
-                            class="text-slate-400 p-3 border border-slate-700 rounded transition hover:text-slate-100 hover:bg-slate-800"
+                        <button class="text-slate-400 p-3 border border-slate-700 rounded transition hover:text-slate-100 hover:bg-slate-800"
                             title="随机换一个" @click="randomRoom">
                             <i class="i-mdi-autorenew" />
                         </button>
@@ -361,8 +361,7 @@ onBeforeUnmount(() => {
                 <p class="text-sm text-slate-400 mb-6">
                     点击下方按钮选择要共享的屏幕 / 窗口
                 </p>
-                <button
-                    class="text-base text-white font-medium px-6 py-3 rounded-lg bg-emerald-600 inline-flex gap-2 transition items-center hover:bg-emerald-500"
+                <button class="text-base text-white font-medium px-6 py-3 rounded-lg bg-emerald-600 inline-flex gap-2 transition items-center hover:bg-emerald-500"
                     @click="start">
                     <i class="i-mdi-play" />
                     开始共享屏幕
@@ -421,8 +420,7 @@ onBeforeUnmount(() => {
                         </div>
 
                         <!-- 一键复制二维码卡片（含房间号 + 网址），粘贴发给朋友 -->
-                        <button
-                            class="text-sm text-white font-medium mt-1 px-3 py-2.5 rounded-lg bg-sky-600 flex gap-2 w-full transition items-center justify-center hover:bg-sky-500"
+                        <button class="text-sm text-white font-medium mt-1 px-3 py-2.5 rounded-lg bg-sky-600 flex gap-2 w-full transition items-center justify-center hover:bg-sky-500"
                             @click="copyQrCard">
                             <i class="i-mdi-share-variant" />
                             复制二维码 + 网址
@@ -452,8 +450,7 @@ onBeforeUnmount(() => {
                             <div class="text-sm mb-3">
                                 屏幕共享中断
                             </div>
-                            <button
-                                class="text-sm text-white font-medium px-4 py-2 rounded bg-amber-600 inline-flex gap-1 items-center hover:bg-amber-500"
+                            <button class="text-sm text-white font-medium px-4 py-2 rounded bg-amber-600 inline-flex gap-1 items-center hover:bg-amber-500"
                                 @click="reShare">
                                 <i class="i-mdi-refresh" /> 重新选择屏幕
                             </button>
@@ -526,13 +523,11 @@ onBeforeUnmount(() => {
                     </label>
 
                     <div class="mt-3 flex gap-2">
-                        <button
-                            class="text-sm text-slate-300 px-3 py-2 border border-slate-600 rounded flex flex-1 gap-1 items-center justify-center hover:bg-slate-800"
+                        <button class="text-sm text-slate-300 px-3 py-2 border border-slate-600 rounded flex flex-1 gap-1 items-center justify-center hover:bg-slate-800"
                             @click="reShare">
                             <i class="i-mdi-refresh" /> 重新选屏
                         </button>
-                        <button
-                            class="text-sm text-white font-medium px-3 py-2 rounded bg-red-600 flex flex-1 gap-1 items-center justify-center hover:bg-red-500"
+                        <button class="text-sm text-white font-medium px-3 py-2 rounded bg-red-600 flex flex-1 gap-1 items-center justify-center hover:bg-red-500"
                             @click="stop">
                             <i class="i-mdi-stop" /> 停止共享
                         </button>

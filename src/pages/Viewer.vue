@@ -28,6 +28,17 @@ watch(allowZoom, (v) => {
     if (!v) pz.reset()
 })
 
+// 主机加入后又离开：标记状态、复位缩放（画面已由 useViewer 在 peer-leave 时清空）
+const hostLeft = ref(false)
+watch(() => sig.peerJoined.value, (joined, prev) => {
+    if (joined) {
+        hostLeft.value = false
+    } else if (prev) {
+        hostLeft.value = true
+        pz.reset()
+    }
+})
+
 // 仅在允许时响应缩放/平移
 const onWheel = (e: WheelEvent) => allowZoom.value && pz.onWheel(e)
 const onPointerDown = (e: PointerEvent) => allowZoom.value && pz.onPointerDown(e)
@@ -66,7 +77,7 @@ const back = () => router.push('/')
 
 const stateText = computed(() => {
     if (!sig.connected.value) return '信令连接中…'
-    if (!sig.peerJoined.value) return `等待主机加入房间 ${roomId.value}`
+    if (!sig.peerJoined.value) return hostLeft.value ? '主机已离开，等待重连…' : `等待主机加入房间 ${roomId.value}`
     if (viewer.connectionState.value === 'connected') return ''
     if (viewer.connectionState.value === 'failed') return '连接失败，等待主机重连'
     return 'WebRTC 协商中…'
@@ -139,6 +150,18 @@ const hasStream = computed(() => !!viewer.remoteStream.value)
             class="text-xs font-mono px-3 py-1.5 rounded bg-black/60 bottom-4 right-4 absolute z-10">
             <span :class="sig.connected.value ? 'text-emerald-400' : 'text-amber-400'">●</span>
             {{ viewer.connectionState.value }}
+        </div>
+
+        <!-- 主机锁屏/熄屏导致画面暂停：保留最后一帧，叠加提示，解锁后自动消失 -->
+        <div v-if="hasStream && viewer.videoPaused.value"
+            class="bg-black/70 flex flex-col items-center inset-0 justify-center absolute z-20">
+            <i class="i-mdi-monitor-off text-4xl text-amber-400 mb-3" />
+            <div class="text-lg">
+                主机画面已暂停
+            </div>
+            <div class="text-sm text-slate-400 mt-1">
+                主机可能已锁屏或熄屏，恢复后将自动继续
+            </div>
         </div>
     </div>
 </template>

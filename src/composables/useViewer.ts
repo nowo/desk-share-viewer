@@ -12,6 +12,8 @@ export const useViewer = (signaling: Signaling) => {
     const connectionState = ref<RTCPeerConnectionState>('new')
     const iceState = ref<RTCIceConnectionState>('new')
     const error = ref<string | null>(null)
+    // 主机画面是否暂停出帧（主机锁屏 / 熄屏时屏幕采集被系统暂停 → track mute）
+    const videoPaused = ref(false)
 
     let pc: RTCPeerConnection | null = null
     const pendingIce: RTCIceCandidateInit[] = []
@@ -26,6 +28,11 @@ export const useViewer = (signaling: Signaling) => {
         conn.oniceconnectionstatechange = () => (iceState.value = conn.iceConnectionState)
         conn.ontrack = (e) => {
             remoteStream.value = e.streams[0] || new MediaStream([e.track])
+            // 监听帧暂停/恢复：主机锁屏熄屏会让 track mute，解锁后 unmute 自动恢复
+            const track = e.track
+            videoPaused.value = false
+            track.onmute = () => (videoPaused.value = true)
+            track.onunmute = () => (videoPaused.value = false)
         }
         pc = conn
         return conn
@@ -60,6 +67,7 @@ export const useViewer = (signaling: Signaling) => {
         remoteStream.value = null
         connectionState.value = 'closed'
         iceState.value = 'closed'
+        videoPaused.value = false
     }
 
     signaling.onMessage(async (m) => {
@@ -67,6 +75,9 @@ export const useViewer = (signaling: Signaling) => {
             await handleOffer(m.sdp)
         } else if (m.type === 'ice') {
             await handleIce(m.candidate)
+        } else if (m.type === 'peer-leave') {
+            // 主机停止共享 / 退出：清掉旧画面与连接，等主机回来重新协商
+            reset()
         } else if (m.type === 'kicked') {
             error.value = '当前会话被新连接替换'
             reset()
@@ -75,5 +86,5 @@ export const useViewer = (signaling: Signaling) => {
 
     onBeforeUnmount(reset)
 
-    return { remoteStream, connectionState, iceState, error, reset }
+    return { remoteStream, connectionState, iceState, error, videoPaused, reset }
 }

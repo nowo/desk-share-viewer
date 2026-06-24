@@ -111,6 +111,24 @@ export const useHost = (signaling: Signaling) => {
         }
     }
 
+    // Electron / Chromium 的老式 getUserMedia + chromeMediaSourceId 路径，
+    // mandatory.maxWidth/maxHeight 不设的话 Chrome 默认抓 720p；明确设到 1080p 才能拿原画
+    const capture = (sourceId: string): Promise<MediaStream> =>
+        navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: {
+                mandatory: {
+                    chromeMediaSource: 'desktop',
+                    chromeMediaSourceId: sourceId,
+                    maxWidth: currentPreset.maxWidth,
+                    maxHeight: currentPreset.maxHeight,
+                    minWidth: Math.min(1280, currentPreset.maxWidth),
+                    minHeight: Math.min(720, currentPreset.maxHeight),
+                    maxFrameRate: currentPreset.maxFrameRate,
+                },
+            } as any,
+        })
+
     const startShare = async (sourceId?: string) => {
         error.value = null
         trackEnded.value = false
@@ -118,22 +136,7 @@ export const useHost = (signaling: Signaling) => {
             if (!sourceId) {
                 throw new Error('未选择共享源')
             }
-            // Electron / Chromium 的老式 getUserMedia + chromeMediaSourceId 路径，
-            // mandatory.maxWidth/maxHeight 不设的话 Chrome 默认抓 720p；明确设到 1080p 才能拿原画
-            const newStream = await navigator.mediaDevices.getUserMedia({
-                audio: false,
-                video: {
-                    mandatory: {
-                        chromeMediaSource: 'desktop',
-                        chromeMediaSourceId: sourceId,
-                        maxWidth: currentPreset.maxWidth,
-                        maxHeight: currentPreset.maxHeight,
-                        minWidth: Math.min(1280, currentPreset.maxWidth),
-                        minHeight: Math.min(720, currentPreset.maxHeight),
-                        maxFrameRate: currentPreset.maxFrameRate,
-                    },
-                } as any,
-            })
+            const newStream = await capture(sourceId)
             stream.value = newStream
             await attachTrack(newStream)
             await applyBitrate()
@@ -153,22 +156,7 @@ export const useHost = (signaling: Signaling) => {
             if (!sourceId) {
                 throw new Error('未选择共享源')
             }
-            // Electron / Chromium 的老式 getUserMedia + chromeMediaSourceId 路径，
-            // mandatory.maxWidth/maxHeight 不设的话 Chrome 默认抓 720p；明确设到 1080p 才能拿原画
-            const newStream = await navigator.mediaDevices.getUserMedia({
-                audio: false,
-                video: {
-                    mandatory: {
-                        chromeMediaSource: 'desktop',
-                        chromeMediaSourceId: sourceId,
-                        maxWidth: currentPreset.maxWidth,
-                        maxHeight: currentPreset.maxHeight,
-                        minWidth: Math.min(1280, currentPreset.maxWidth),
-                        minHeight: Math.min(720, currentPreset.maxHeight),
-                        maxFrameRate: currentPreset.maxFrameRate,
-                    },
-                } as any,
-            })
+            const newStream = await capture(sourceId)
             stream.value?.getTracks().forEach(t => t.stop())
             stream.value = newStream
             await attachTrack(newStream)
