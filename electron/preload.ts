@@ -4,6 +4,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 const api = {
     getLanIp: () => ipcRenderer.invoke('get-lan-ip') as Promise<string | null>,
     getSignalPort: () => ipcRenderer.invoke('signal-port') as Promise<number>,
+    getHttpPort: () => ipcRenderer.invoke('http-port') as Promise<number>,
     preventSleep: () => ipcRenderer.invoke('prevent-sleep') as Promise<boolean>,
     allowSleep: () => ipcRenderer.invoke('allow-sleep') as Promise<void>,
     openInBrowser: (url: string) => ipcRenderer.invoke('open-in-browser', url) as Promise<void>,

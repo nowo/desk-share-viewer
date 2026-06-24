@@ -47,6 +47,11 @@ const removeFromRooms = (sock: WebSocket) => {
 export function startSignaling(port: number): WebSocketServer {
     const wss = new WebSocketServer({ port, host: '0.0.0.0', path: '/signal' })
 
+    // 端口被占等监听错误：打日志兜底，避免未捕获异常拖垮主进程
+    wss.on('error', (e) => {
+        console.error(`[signaling] listen error on ${port}:`, e)
+    })
+
     wss.on('connection', (sock) => {
         sock.on('message', (raw) => {
             let msg: any

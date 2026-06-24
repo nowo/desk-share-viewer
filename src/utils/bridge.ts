@@ -13,6 +13,7 @@ export interface UpdateResult {
 interface DeskApi {
     getLanIp: () => Promise<string | null>
     getSignalPort: () => Promise<number>
+    getHttpPort: () => Promise<number>
     preventSleep: () => Promise<boolean>
     allowSleep: () => Promise<void>
     openInBrowser: (url: string) => Promise<void>
@@ -34,7 +35,11 @@ interface DeskApi {
 }
 
 declare global {
-    interface Window { desk?: DeskApi }
+    interface Window {
+        desk?: DeskApi
+        // 主机静态 server 注入的真实信令端口（观众端浏览器场景用）
+        __DESK_SIGNAL_PORT__?: number
+    }
 }
 
 const inElectron = (): boolean => typeof window !== 'undefined' && typeof window.desk !== 'undefined'
@@ -45,8 +50,15 @@ export const getLanIp = async (): Promise<string | null> => {
 }
 
 export const getSignalPort = async (): Promise<number> => {
-    if (!inElectron()) return 51234
+    // 观众端浏览器：用主机注入的真实端口，没有再回退默认值
+    if (!inElectron()) return window.__DESK_SIGNAL_PORT__ ?? 51234
     return window.desk!.getSignalPort()
+}
+
+export const getHttpPort = async (): Promise<number> => {
+    // 观众端浏览器：页面就是静态 server 提供的，端口即当前 location.port
+    if (!inElectron()) return Number(window.location.port) || 1420
+    return window.desk!.getHttpPort()
 }
 
 export const preventSleep = async (): Promise<boolean> => {

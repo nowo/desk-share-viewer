@@ -9,6 +9,7 @@ import process from 'node:process'
 // - 启 WebSocket 信令服务
 // - 暴露 IPC 给 renderer：get-lan-ip / virtual display / sleep-lock / open-in-browser / get-display-sources
 import { app, BrowserWindow, desktopCapturer, ipcMain, Menu, screen, shell } from 'electron'
+import { findFreePort } from './find-port'
 import { startSignaling } from './signaling'
 import { allowSleep, preventSleep } from './sleep-lock'
 import { startStaticServer } from './static-server'
@@ -21,14 +22,18 @@ import {
     virtualDisplayStatus,
 } from './virtual-display'
 
-const SIGNAL_PORT = 51234
-const HTTP_PORT = 1420 // 跟 dev 模式 Vite 一致，dev/prod 观众 URL 统一
+const PREFERRED_SIGNAL_PORT = 51234
+const PREFERRED_HTTP_PORT = 1420 // 跟 dev 模式 Vite 一致，dev/prod 观众 URL 统一
 
 let mainWindow: BrowserWindow | null = null
 let wss: WebSocketServer | null = null
 let staticServer: HttpServer | null = null
 
 const isDev = !app.isPackaged
+
+// 实际使用的端口：生产环境若首选端口被占会自动顺延，dev 维持固定端口
+let signalPort = PREFERRED_SIGNAL_PORT
+let httpPort = PREFERRED_HTTP_PORT
 
 function getLanIp(): string | null {
     const ifaces = networkInterfaces()
@@ -44,7 +49,8 @@ function getLanIp(): string | null {
 
 function registerIpc() {
     ipcMain.handle('get-lan-ip', () => getLanIp())
-    ipcMain.handle('signal-port', () => SIGNAL_PORT)
+    ipcMain.handle('signal-port', () => signalPort)
+    ipcMain.handle('http-port', () => httpPort)
     ipcMain.handle('prevent-sleep', () => preventSleep())
     ipcMain.handle('allow-sleep', () => {
         allowSleep()
@@ -174,17 +180,25 @@ function buildAppMenu() {
     Menu.setApplicationMenu(Menu.buildFromTemplate(template))
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
     buildAppMenu()
+
+    // dev 维持固定端口（观众端浏览器 fallback 写死 51234 / Vite 占 1420）；
+    // production 探测可用端口，避开被其他程序占用的情况
+    if (!isDev) {
+        signalPort = await findFreePort(PREFERRED_SIGNAL_PORT)
+        httpPort = await findFreePort(PREFERRED_HTTP_PORT)
+    }
+
     registerIpc()
-    wss = startSignaling(SIGNAL_PORT)
-    console.warn(`[signaling] listening on 0.0.0.0:${SIGNAL_PORT}/signal`)
+    wss = startSignaling(signalPort)
+    console.warn(`[signaling] listening on 0.0.0.0:${signalPort}/signal`)
 
     // production：起静态 server 让 LAN 浏览器能访问 viewer URL
     // dev：Vite 已经在 1420 监听了，不重复起
     if (!isDev) {
         const distDir = path.join(__dirname, '../dist')
-        staticServer = startStaticServer(distDir, HTTP_PORT)
+        staticServer = startStaticServer(distDir, httpPort, signalPort)
     }
 
     createWindow()

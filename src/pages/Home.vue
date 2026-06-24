@@ -71,7 +71,7 @@ const currentVersion = computed(() => update.result.value?.currentVersion)
                     特性：
                 </p>
                 <ul class="list-disc list-inside space-y-1">
-                    <li>LAN 内置 WebSocket 信令服务（0.0.0.0:51234），无需外部依赖</li>
+                    <li>LAN 内置 WebSocket 信令服务（默认 0.0.0.0:51234，端口被占用时自动顺延），无需外部依赖</li>
                     <li>Mac 防休眠 powerSaveBlocker，共享期间系统不锁屏</li>
                     <li>断线自动重连，ICE 失败自动 restart，replaceTrack 换屏不掉房间</li>
                     <li>macOS 虚拟显示器（SkyLight 私有 API，DeskPad 等价物）</li>

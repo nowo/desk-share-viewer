@@ -8,7 +8,7 @@ import { useHost } from '~/composables/useHost'
 import { usePanZoom } from '~/composables/usePanZoom'
 import { useSignaling } from '~/composables/useSignaling'
 import { useVirtualDisplay } from '~/composables/useVirtualDisplay'
-import { getLanIp, getSignalPort } from '~/utils/bridge'
+import { getHttpPort, getLanIp, getSignalPort } from '~/utils/bridge'
 import { newRoomId } from '~/utils/ids'
 
 const router = useRouter()
@@ -51,17 +51,19 @@ const randomRoom = () => {
     roomId.value = newRoomId()
 }
 
-// 观众端用浏览器（同 WiFi）访问 http://<lanIp>:1420/#/<roomId>
+// 观众端用浏览器（同 WiFi）访问 http://<lanIp>:<httpPort>/#/<roomId>
 const lanIp = ref<string | null>(null)
 const signalPort = ref(51234)
+const httpPort = ref(1420)
 onMounted(async () => {
     lanIp.value = await getLanIp()
     signalPort.value = await getSignalPort()
+    httpPort.value = await getHttpPort()
 })
 
 const viewerUrl = computed(() => {
     if (!lanIp.value) return ''
-    return `http://${lanIp.value}:1420/#/${roomId.value}`
+    return `http://${lanIp.value}:${httpPort.value}/#/${roomId.value}`
 })
 
 const qrDataUrl = ref('')
