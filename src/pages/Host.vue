@@ -100,6 +100,11 @@ watchEffect(() => {
     }
 })
 
+// 共享中断时退出放大模式 —— 放大层绑的 stream 已失效，留着只会黑屏
+watch(() => host.trackEnded.value, (ended) => {
+    if (ended && zoomOpen.value) closeZoom()
+})
+
 // 允许观众放大：默认开，通过信令下发给观众端
 const ZOOM_PERM_KEY = 'desk-host-allow-viewer-zoom'
 const allowViewerZoom = ref(localStorage.getItem(ZOOM_PERM_KEY) !== '0')
