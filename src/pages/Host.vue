@@ -188,6 +188,77 @@ const copyRoom = () => navigator.clipboard?.writeText(roomId.value)
 const copyHost = () => lanIp.value && navigator.clipboard?.writeText(`${lanIp.value}:${signalPort.value}`)
 const copyLink = () => viewerUrl.value && navigator.clipboard?.writeText(viewerUrl.value)
 
+// 复制反馈提示
+const copyHint = ref('')
+let hintTimer: ReturnType<typeof setTimeout> | null = null
+const showHint = (msg: string) => {
+    copyHint.value = msg
+    if (hintTimer) clearTimeout(hintTimer)
+    hintTimer = setTimeout(() => (copyHint.value = ''), 2500)
+}
+
+const loadImage = (src: string): Promise<HTMLImageElement> =>
+    new Promise((resolve, reject) => {
+        const img = new Image()
+        img.onload = () => resolve(img)
+        img.onerror = reject
+        img.src = src
+    })
+
+// 合成「二维码 + 房间号 + 网址」一张图复制到剪贴板，直接粘贴发给朋友
+const copyQrCard = async () => {
+    if (!qrDataUrl.value || !viewerUrl.value) return
+    try {
+        const s = 2 // 高清：实际像素翻倍
+        const W = 560
+        const QR = 360
+        const H = 600
+        const canvas = document.createElement('canvas')
+        canvas.width = W * s
+        canvas.height = H * s
+        const ctx = canvas.getContext('2d')!
+        ctx.scale(s, s)
+        ctx.fillStyle = '#ffffff'
+        ctx.fillRect(0, 0, W, H)
+        ctx.textAlign = 'center'
+
+        // 标题
+        ctx.fillStyle = '#0f172a'
+        ctx.font = 'bold 30px system-ui, sans-serif'
+        ctx.fillText('扫码加入屏幕共享', W / 2, 56)
+
+        // 二维码
+        const img = await loadImage(qrDataUrl.value)
+        ctx.drawImage(img, (W - QR) / 2, 84, QR, QR)
+
+        // 房间号
+        ctx.fillStyle = '#64748b'
+        ctx.font = '20px system-ui, sans-serif'
+        ctx.fillText('房间号', W / 2, 490)
+        ctx.fillStyle = '#0ea5e9'
+        ctx.font = 'bold 40px ui-monospace, monospace'
+        ctx.fillText(roomId.value, W / 2, 532)
+
+        // 网址（过长自动缩字号防溢出）
+        let urlFont = 18
+        ctx.font = `${urlFont}px ui-monospace, monospace`
+        while (ctx.measureText(viewerUrl.value).width > W - 48 && urlFont > 10) {
+            urlFont -= 1
+            ctx.font = `${urlFont}px ui-monospace, monospace`
+        }
+        ctx.fillStyle = '#334155'
+        ctx.fillText(viewerUrl.value, W / 2, 576)
+
+        const blob: Blob = await new Promise((res, rej) =>
+            canvas.toBlob(b => (b ? res(b) : rej(new Error('toBlob failed'))), 'image/png'))
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
+        showHint('已复制二维码图片')
+    } catch (e) {
+        console.warn('[copyQrCard] failed:', e)
+        showHint('复制失败，请重试')
+    }
+}
+
 const back = () => router.push('/')
 
 const fmtState = (s: string): string => ({
@@ -225,8 +296,7 @@ onBeforeUnmount(() => {
             </div>
 
             <!-- 虚拟显示器面板：仅 macOS 主机显示（SkyLight 私有 API 不跨端） -->
-            <div v-if="vd.supported.value"
-                class="mb-6 p-4 border border-amber-500/30 rounded-xl bg-amber-500/5">
+            <div v-if="vd.supported.value" class="mb-6 p-4 border border-amber-500/30 rounded-xl bg-amber-500/5">
                 <div class="flex gap-4 items-start">
                     <i class="i-mdi-view-grid text-2xl text-amber-400 mt-1" />
                     <div class="flex-1">
@@ -258,8 +328,7 @@ onBeforeUnmount(() => {
                         class="text-sm font-medium px-3 py-1.5 border rounded flex gap-1 transition items-center disabled:opacity-50"
                         :class="vd.info.value
                             ? 'border-slate-600 text-slate-300 hover:bg-slate-800'
-                            : 'border-amber-500 text-amber-300 hover:bg-amber-500/10'"
-                        @click="toggleVirtualDisplay">
+                            : 'border-amber-500 text-amber-300 hover:bg-amber-500/10'" @click="toggleVirtualDisplay">
                         <i :class="vd.info.value ? 'i-mdi-power' : 'i-mdi-plus-circle'" />
                         {{ vd.info.value ? '关闭' : '打开虚拟屏' }}
                     </button>
@@ -281,7 +350,8 @@ onBeforeUnmount(() => {
                         <input v-model="roomInput" maxlength="6" inputmode="numeric"
                             class="text-2xl text-sky-400 tracking-widest font-bold font-mono px-4 py-3 text-center outline-none border border-slate-700 rounded bg-slate-900 flex-1 focus:border-sky-500"
                             @blur="commitRoom" @keydown.enter="commitRoom">
-                        <button class="text-slate-400 p-3 border border-slate-700 rounded transition hover:text-slate-100 hover:bg-slate-800"
+                        <button
+                            class="text-slate-400 p-3 border border-slate-700 rounded transition hover:text-slate-100 hover:bg-slate-800"
                             title="随机换一个" @click="randomRoom">
                             <i class="i-mdi-autorenew" />
                         </button>
@@ -291,7 +361,8 @@ onBeforeUnmount(() => {
                 <p class="text-sm text-slate-400 mb-6">
                     点击下方按钮选择要共享的屏幕 / 窗口
                 </p>
-                <button class="text-base text-white font-medium px-6 py-3 rounded-lg bg-emerald-600 inline-flex gap-2 transition items-center hover:bg-emerald-500"
+                <button
+                    class="text-base text-white font-medium px-6 py-3 rounded-lg bg-emerald-600 inline-flex gap-2 transition items-center hover:bg-emerald-500"
                     @click="start">
                     <i class="i-mdi-play" />
                     开始共享屏幕
@@ -348,6 +419,17 @@ onBeforeUnmount(() => {
                                 </button>
                             </div>
                         </div>
+
+                        <!-- 一键复制二维码卡片（含房间号 + 网址），粘贴发给朋友 -->
+                        <button
+                            class="text-sm text-white font-medium mt-1 px-3 py-2.5 rounded-lg bg-sky-600 flex gap-2 w-full transition items-center justify-center hover:bg-sky-500"
+                            @click="copyQrCard">
+                            <i class="i-mdi-share-variant" />
+                            复制二维码 + 网址
+                        </button>
+                        <p v-if="copyHint" class="text-xs text-emerald-400 mt-1 text-center">
+                            {{ copyHint }}
+                        </p>
                     </div>
                 </div>
 
@@ -370,7 +452,8 @@ onBeforeUnmount(() => {
                             <div class="text-sm mb-3">
                                 屏幕共享中断
                             </div>
-                            <button class="text-sm text-white font-medium px-4 py-2 rounded bg-amber-600 inline-flex gap-1 items-center hover:bg-amber-500"
+                            <button
+                                class="text-sm text-white font-medium px-4 py-2 rounded bg-amber-600 inline-flex gap-1 items-center hover:bg-amber-500"
                                 @click="reShare">
                                 <i class="i-mdi-refresh" /> 重新选择屏幕
                             </button>
@@ -443,11 +526,13 @@ onBeforeUnmount(() => {
                     </label>
 
                     <div class="mt-3 flex gap-2">
-                        <button class="text-sm text-slate-300 px-3 py-2 border border-slate-600 rounded flex flex-1 gap-1 items-center justify-center hover:bg-slate-800"
+                        <button
+                            class="text-sm text-slate-300 px-3 py-2 border border-slate-600 rounded flex flex-1 gap-1 items-center justify-center hover:bg-slate-800"
                             @click="reShare">
                             <i class="i-mdi-refresh" /> 重新选屏
                         </button>
-                        <button class="text-sm text-white font-medium px-3 py-2 rounded bg-red-600 flex flex-1 gap-1 items-center justify-center hover:bg-red-500"
+                        <button
+                            class="text-sm text-white font-medium px-3 py-2 rounded bg-red-600 flex flex-1 gap-1 items-center justify-center hover:bg-red-500"
                             @click="stop">
                             <i class="i-mdi-stop" /> 停止共享
                         </button>
@@ -465,11 +550,9 @@ onBeforeUnmount(() => {
             @cancel="pickerOpen = false" />
 
         <!-- 放大查看：全屏覆盖层，滚轮缩放 + 拖拽平移 -->
-        <div v-if="zoomOpen"
-            class="bg-black/95 flex items-center inset-0 justify-center fixed z-50"
+        <div v-if="zoomOpen" class="bg-black/95 flex items-center inset-0 justify-center fixed z-50"
             @click.self="closeZoom">
-            <video ref="zoomEl" autoplay muted playsinline
-                class="max-h-full max-w-full select-none"
+            <video ref="zoomEl" autoplay muted playsinline class="max-h-full max-w-full select-none"
                 :style="{ transform: pz.transform.value, cursor: pz.cursor.value, transition: pz.dragging.value ? 'none' : 'transform 0.1s ease-out' }"
                 @wheel="pz.onWheel" @pointerdown="pz.onPointerDown" @pointermove="pz.onPointerMove"
                 @pointerup="pz.onPointerUp" @pointercancel="pz.onPointerUp" @dblclick="pz.reset" />
@@ -477,18 +560,23 @@ onBeforeUnmount(() => {
             <!-- 工具栏 -->
             <div class="px-3 py-2 rounded-full bg-slate-800/90 flex gap-1 items-center bottom-6 left-1/2 fixed backdrop-blur -translate-x-1/2"
                 @click.stop>
-                <button class="text-slate-200 p-2 rounded-full transition hover:bg-slate-700" title="缩小" @click="pz.zoomOut">
+                <button class="text-slate-200 p-2 rounded-full transition hover:bg-slate-700" title="缩小"
+                    @click="pz.zoomOut">
                     <i class="i-mdi-magnify-minus-outline text-lg" />
                 </button>
-                <span class="text-sm text-slate-300 font-mono px-2 text-center w-14 tabular-nums">{{ Math.round(pz.scale.value * 100) }}%</span>
-                <button class="text-slate-200 p-2 rounded-full transition hover:bg-slate-700" title="放大" @click="pz.zoomIn">
+                <span class="text-sm text-slate-300 font-mono px-2 text-center w-14 tabular-nums">{{
+                    Math.round(pz.scale.value * 100) }}%</span>
+                <button class="text-slate-200 p-2 rounded-full transition hover:bg-slate-700" title="放大"
+                    @click="pz.zoomIn">
                     <i class="i-mdi-magnify-plus-outline text-lg" />
                 </button>
-                <button class="text-slate-200 p-2 rounded-full transition hover:bg-slate-700" title="重置" @click="pz.reset">
+                <button class="text-slate-200 p-2 rounded-full transition hover:bg-slate-700" title="重置"
+                    @click="pz.reset">
                     <i class="i-mdi-restore text-lg" />
                 </button>
                 <div class="mx-1 bg-slate-600 h-5 w-px" />
-                <button class="text-slate-200 p-2 rounded-full transition hover:bg-slate-700" title="关闭 (Esc)" @click="closeZoom">
+                <button class="text-slate-200 p-2 rounded-full transition hover:bg-slate-700" title="关闭 (Esc)"
+                    @click="closeZoom">
                     <i class="i-mdi-close text-lg" />
                 </button>
             </div>
