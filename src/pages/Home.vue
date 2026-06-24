@@ -2,9 +2,13 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUpdate } from '~/composables/useUpdate'
+import { isElectron } from '~/utils/bridge'
 
 const router = useRouter()
 const inputRoom = ref('')
+
+// 观众端是浏览器，没有抓屏能力，只放开「加入房间」，隐藏主机入口
+const canHost = isElectron()
 
 const goHost = () => router.push('/host')
 const canJoin = computed(() => /^\d{6}$/.test(inputRoom.value.trim()))
@@ -26,9 +30,10 @@ const currentVersion = computed(() => update.result.value?.currentVersion)
                 屏幕共享 + 演示画布 · WebRTC P2P · 锁屏不断
             </p>
 
-            <div class="gap-6 grid w-full md:grid-cols-2">
-                <!-- 主机 -->
-                <div class="p-8 border border-slate-700 rounded-xl bg-slate-800/50 cursor-pointer transition hover:border-sky-500 hover:shadow-lg hover:-translate-y-1"
+            <div class="gap-6 grid w-full" :class="canHost ? 'md:grid-cols-2' : 'max-w-md'">
+                <!-- 主机：仅 Electron 端（浏览器观众无抓屏能力） -->
+                <div v-if="canHost"
+                    class="p-8 border border-slate-700 rounded-xl bg-slate-800/50 cursor-pointer transition hover:border-sky-500 hover:shadow-lg hover:-translate-y-1"
                     @click="goHost">
                     <div class="text-sky-400 mb-3">
                         <i class="i-mdi-monitor text-4xl" />

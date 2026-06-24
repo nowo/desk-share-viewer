@@ -42,37 +42,38 @@ declare global {
     }
 }
 
-const inElectron = (): boolean => typeof window !== 'undefined' && typeof window.desk !== 'undefined'
+// 是否运行在 Electron 主机端（观众端是浏览器，没有 window.desk）
+export const isElectron = (): boolean => typeof window !== 'undefined' && typeof window.desk !== 'undefined'
 
 export const getLanIp = async (): Promise<string | null> => {
-    if (!inElectron()) return window.location.hostname
+    if (!isElectron()) return window.location.hostname
     return window.desk!.getLanIp()
 }
 
 export const getSignalPort = async (): Promise<number> => {
     // 观众端浏览器：用主机注入的真实端口，没有再回退默认值
-    if (!inElectron()) return window.__DESK_SIGNAL_PORT__ ?? 51234
+    if (!isElectron()) return window.__DESK_SIGNAL_PORT__ ?? 51234
     return window.desk!.getSignalPort()
 }
 
 export const getHttpPort = async (): Promise<number> => {
     // 观众端浏览器：页面就是静态 server 提供的，端口即当前 location.port
-    if (!inElectron()) return Number(window.location.port) || 1420
+    if (!isElectron()) return Number(window.location.port) || 1420
     return window.desk!.getHttpPort()
 }
 
 export const preventSleep = async (): Promise<boolean> => {
-    if (!inElectron()) return false
+    if (!isElectron()) return false
     return window.desk!.preventSleep()
 }
 
 export const allowSleep = async (): Promise<void> => {
-    if (!inElectron()) return
+    if (!isElectron()) return
     return window.desk!.allowSleep()
 }
 
 export const openInBrowser = async (url: string): Promise<void> => {
-    if (!inElectron()) {
+    if (!isElectron()) {
         window.open(url, '_blank')
         return
     }
@@ -81,11 +82,11 @@ export const openInBrowser = async (url: string): Promise<void> => {
 
 // 观众端（浏览器）没有「更新」概念，直接返回无更新
 export const checkForUpdate = async (): Promise<UpdateResult> => {
-    if (!inElectron()) return { hasUpdate: false, currentVersion: '' }
+    if (!isElectron()) return { hasUpdate: false, currentVersion: '' }
     return window.desk!.checkForUpdate()
 }
 
 export const onMenuCheckUpdate = (cb: () => void): (() => void) => {
-    if (!inElectron()) return () => {}
+    if (!isElectron()) return () => {}
     return window.desk!.onMenuCheckUpdate(cb)
 }

@@ -1,9 +1,10 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
+import { isElectron } from '~/utils/bridge'
 import Home from './pages/Home.vue'
 import Host from './pages/Host.vue'
 import Viewer from './pages/Viewer.vue'
 
-export default createRouter({
+const router = createRouter({
     history: createWebHashHistory(),
     routes: [
         { path: '/', component: Home },
@@ -16,3 +17,11 @@ export default createRouter({
         { path: '/:catchAll(.*)', redirect: '/' },
     ],
 })
+
+// 浏览器观众没有抓屏能力，直接访问 /host 一律回首页
+router.beforeEach((to) => {
+    if (to.path === '/host' && !isElectron()) return '/'
+    return true
+})
+
+export default router
