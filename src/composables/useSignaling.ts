@@ -12,7 +12,10 @@ export interface ISignalMsg {
 export const useSignaling = () => {
     const ws = ref<WebSocket | null>(null)
     const connected = ref(false)
+    // host：至少有一个观众；viewer：主机在线
     const peerJoined = ref(false)
+    // host 端在线观众数（viewer 端恒 0）
+    const peerCount = ref(0)
 
     let currentRoom: string | null = null
     let currentRole: Role | null = null
@@ -20,6 +23,8 @@ export const useSignaling = () => {
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null
     let pingTimer: ReturnType<typeof setInterval> | null = null
     let manualClose = false
+    // host 端维护的观众 peerId 集合（用于计数，重连后由服务器补发 peer-join 重建）
+    const viewerIds = new Set<string>()
     const handlers = new Set<(m: ISignalMsg) => void>()
     // 发送队列：WS 还没 open 时缓存消息，open 后一起 flush
     // 修 bug：首次共享时 startShare 内部 sendOffer 在 sig.connect 之前触发，
@@ -64,6 +69,10 @@ export const useSignaling = () => {
         sock.onopen = () => {
             connected.value = true
             reconnectAttempt = 0
+            // 重连：清空旧观众计数，等服务器重新补发 peer-join 重建
+            viewerIds.clear()
+            peerCount.value = 0
+            peerJoined.value = false
             startPing()
             // join 必须最先发（服务器据此把这条连接绑到房间）
             if (currentRoom && currentRole) {
@@ -84,8 +93,22 @@ export const useSignaling = () => {
                 return
             }
             if (msg.type === 'pong') return
-            if (msg.type === 'peer-join') peerJoined.value = true
-            if (msg.type === 'peer-leave') peerJoined.value = false
+            if (msg.type === 'peer-join') {
+                // host：msg.peerId=新观众；viewer：无 peerId，表示主机在线
+                if (currentRole === 'host' && msg.peerId) {
+                    viewerIds.add(msg.peerId)
+                    peerCount.value = viewerIds.size
+                }
+                peerJoined.value = currentRole === 'host' ? viewerIds.size > 0 : true
+            } else if (msg.type === 'peer-leave') {
+                if (currentRole === 'host') {
+                    if (msg.peerId) viewerIds.delete(msg.peerId)
+                    peerCount.value = viewerIds.size
+                    peerJoined.value = viewerIds.size > 0
+                } else {
+                    peerJoined.value = false
+                }
+            }
             handlers.forEach(h => h(msg))
         }
 
@@ -125,6 +148,8 @@ export const useSignaling = () => {
         ws.value = null
         connected.value = false
         peerJoined.value = false
+        viewerIds.clear()
+        peerCount.value = 0
         pendingQueue.length = 0
     }
 
@@ -133,7 +158,7 @@ export const useSignaling = () => {
         return () => handlers.delete(fn)
     }
 
-    return { connected, peerJoined, connect, close, send, onMessage }
+    return { connected, peerJoined, peerCount, connect, close, send, onMessage }
 }
 
 export type Signaling = ReturnType<typeof useSignaling>

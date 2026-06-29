@@ -117,16 +117,17 @@ watch(allowViewerZoom, (v) => {
     localStorage.setItem(ZOOM_PERM_KEY, v ? '1' : '0')
     sendZoomPermission()
 })
-// 观众加入时把当前权限补发一次（覆盖晚加入的观众）
-watch(() => sig.peerJoined.value, (joined) => {
-    if (joined) sendZoomPermission()
+// 有新观众加入时把当前权限补发一次（control 是广播，其他观众重复收无害）
+watch(() => sig.peerCount.value, (n, prev) => {
+    if (n > prev) sendZoomPermission()
 })
 
-// 共享中切换房间号：断开旧房间信令，连新房间
+// 共享中切换房间号：断开旧房间信令 + 清掉旧房间所有观众连接，再连新房间
 // （未共享时改房间号只更新 URL/QR，不动信令）
 watch(roomId, (newRoom, oldRoom) => {
     if (newRoom === oldRoom || !host.sharing.value) return
     sig.close()
+    host.resetPeers()
     sig.connect({ room: newRoom, role: 'host' })
 })
 
@@ -260,17 +261,6 @@ const copyQrCard = async () => {
 }
 
 const back = () => router.push('/')
-
-const fmtState = (s: string): string => ({
-    new: '未开始',
-    connecting: '握手中',
-    connected: '已连接',
-    disconnected: '断开（自动重连）',
-    failed: '失败',
-    closed: '已关闭',
-    checking: '检查中',
-    completed: '完成',
-} as Record<string, string>)[s] || s
 
 const onKeydown = (e: KeyboardEvent) => {
     if (e.key === 'Escape' && zoomOpen.value) closeZoom()
@@ -472,27 +462,19 @@ onBeforeUnmount(() => {
                                 观众
                             </div>
                             <div class="font-semibold"
-                                :class="sig.peerJoined.value ? 'text-emerald-400' : 'text-slate-500'">
-                                {{ sig.peerJoined.value ? '在线' : '等待' }}
+                                :class="sig.peerCount.value > 0 ? 'text-emerald-400' : 'text-slate-500'">
+                                {{ sig.peerCount.value > 0 ? `${sig.peerCount.value} 人在线` : '等待' }}
                             </div>
                         </div>
                         <div class="px-3 py-2 rounded bg-slate-900">
                             <div class="text-xs text-slate-500">
-                                PC
+                                已连接
                             </div>
                             <div class="font-semibold">
-                                {{ fmtState(host.connectionState.value) }}
+                                {{ host.connectedCount.value }} / {{ sig.peerCount.value }}
                             </div>
                         </div>
                         <div class="px-3 py-2 rounded bg-slate-900">
-                            <div class="text-xs text-slate-500">
-                                ICE
-                            </div>
-                            <div class="font-semibold">
-                                {{ fmtState(host.iceState.value) }}
-                            </div>
-                        </div>
-                        <div class="px-3 py-2 rounded bg-slate-900 col-span-2">
                             <div class="text-xs text-slate-500">
                                 防休眠
                             </div>

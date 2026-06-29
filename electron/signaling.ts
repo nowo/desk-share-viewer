@@ -1,22 +1,40 @@
-// Node WebSocket signaling server — 协议跟之前 Rust axum 版本完全一致
+// Node WebSocket signaling server —— 一对多：一个 host ↔ 多个 viewer
 // 客户端 → 服务器:
 //   { type: 'join', room, role: 'host' | 'viewer' }
-//   { type: 'offer'|'answer'|'ice', ... }
-//   { type: 'control', allowZoom } (主机下发观众端能力开关)
+//   { type: 'offer'|'ice', to, ... }       (host → 指定 viewer，to=viewer peerId)
+//   { type: 'answer'|'ice', ... }          (viewer → host，服务器注入 from)
+//   { type: 'control', ... }               (host 广播给所有 viewer)
 //   { type: 'ping' }
 // 服务器 → 客户端:
-//   { type: 'joined'|'peer-join'|'peer-leave'|'kicked'|'error'|'pong' }
-//   { type: 'offer'|'answer'|'ice'|'control' } (透传)
+//   { type: 'joined', role, peerId }                  (告知自身 peerId)
+//   { type: 'peer-join', peerId? }                    (host 收到带 peerId=新观众；viewer 收到表示主机在线)
+//   { type: 'peer-leave', peerId? }                   (host 收到带 peerId=该观众离开；viewer 收到表示主机离开)
+//   { type: 'offer'|'answer'|'ice'|'control', from? } (透传，viewer→host 带 from)
+//   { type: 'kicked'|'error'|'pong' }
+import { randomUUID } from 'node:crypto'
 import { WebSocket, WebSocketServer } from 'ws'
 
 type Role = 'host' | 'viewer'
 
+interface Peer {
+    sock: WebSocket
+    id: string
+}
+
 interface Room {
-    host?: WebSocket
-    viewer?: WebSocket
+    host?: Peer
+    viewers: Map<string, Peer> // peerId → viewer
+}
+
+interface ConnInfo {
+    roomId: string
+    role: Role
+    peerId: string
 }
 
 const rooms = new Map<string, Room>()
+// 每条连接的归属信息，close / 转发时用
+const conns = new Map<WebSocket, ConnInfo>()
 
 const safeSend = (sock: WebSocket, data: any) => {
     if (sock.readyState === WebSocket.OPEN) {
@@ -26,22 +44,23 @@ const safeSend = (sock: WebSocket, data: any) => {
     }
 }
 
-const findPeer = (sock: WebSocket): { roomId: string, role: Role, room: Room } | null => {
-    for (const [roomId, room] of rooms) {
-        if (room.host === sock) return { roomId, role: 'host', room }
-        if (room.viewer === sock) return { roomId, role: 'viewer', room }
+const removeFromRoom = (sock: WebSocket) => {
+    const info = conns.get(sock)
+    if (!info) return
+    conns.delete(sock)
+    const room = rooms.get(info.roomId)
+    if (!room) return
+    if (info.role === 'host') {
+        if (room.host?.sock === sock) {
+            room.host = undefined
+            // 主机离开 → 通知所有观众（无 peerId）
+            for (const v of room.viewers.values()) safeSend(v.sock, { type: 'peer-leave' })
+        }
+    } else if (room.viewers.delete(info.peerId)) {
+        // 观众离开 → 通知主机（带 peerId）
+        if (room.host) safeSend(room.host.sock, { type: 'peer-leave', peerId: info.peerId })
     }
-    return null
-}
-
-const removeFromRooms = (sock: WebSocket) => {
-    const found = findPeer(sock)
-    if (!found) return null
-    const { roomId, role, room } = found
-    if (role === 'host') room.host = undefined
-    else room.viewer = undefined
-    if (!room.host && !room.viewer) rooms.delete(roomId)
-    return { roomId, role, room }
+    if (!room.host && room.viewers.size === 0) rooms.delete(info.roomId)
 }
 
 export function startSignaling(port: number): WebSocketServer {
@@ -73,46 +92,67 @@ export function startSignaling(port: number): WebSocketServer {
                     safeSend(sock, { type: 'error', message: 'invalid join' })
                     return
                 }
-                // 解绑旧
-                removeFromRooms(sock)
+                // 解绑旧连接
+                removeFromRoom(sock)
                 let room = rooms.get(roomId)
                 if (!room) {
-                    room = {}
+                    room = { viewers: new Map() }
                     rooms.set(roomId, room)
                 }
-                // 同角色重连：踢老的
-                const existing = role === 'host' ? room.host : room.viewer
-                if (existing && existing !== sock) {
-                    safeSend(existing, { type: 'kicked', reason: 'replaced-by-new-connection' })
-                }
-                if (role === 'host') room.host = sock
-                else room.viewer = sock
-                safeSend(sock, { type: 'joined', room: roomId, role })
-                const other = role === 'host' ? room.viewer : room.host
-                if (other) {
-                    safeSend(other, { type: 'peer-join', room: roomId, peerRole: role })
-                    safeSend(sock, { type: 'peer-join', room: roomId, peerRole: role === 'host' ? 'viewer' : 'host' })
+                const peerId = randomUUID()
+                conns.set(sock, { roomId, role, peerId })
+
+                if (role === 'host') {
+                    // 同房间只允许一个 host：踢掉旧的
+                    if (room.host && room.host.sock !== sock) {
+                        safeSend(room.host.sock, { type: 'kicked', reason: 'replaced-by-new-connection' })
+                        conns.delete(room.host.sock)
+                    }
+                    room.host = { sock, id: peerId }
+                    safeSend(sock, { type: 'joined', role, peerId })
+                    // 主机（重）上线：把已有观众补发给它建连，并通知各观众主机在线
+                    for (const v of room.viewers.values()) {
+                        safeSend(sock, { type: 'peer-join', peerId: v.id })
+                        safeSend(v.sock, { type: 'peer-join' })
+                    }
+                } else {
+                    room.viewers.set(peerId, { sock, id: peerId })
+                    safeSend(sock, { type: 'joined', role, peerId })
+                    // 通知主机有新观众；同时若主机在线，告诉观众
+                    if (room.host) {
+                        safeSend(room.host.sock, { type: 'peer-join', peerId })
+                        safeSend(sock, { type: 'peer-join' })
+                    }
                 }
                 return
             }
 
-            // offer / answer / ice / control 透传
-            if (msg.type === 'offer' || msg.type === 'answer' || msg.type === 'ice' || msg.type === 'control') {
-                const found = findPeer(sock)
-                if (!found) {
-                    safeSend(sock, { type: 'error', message: 'not in any room' })
-                    return
+            const info = conns.get(sock)
+            if (!info) {
+                safeSend(sock, { type: 'error', message: 'not in any room' })
+                return
+            }
+            const room = rooms.get(info.roomId)
+            if (!room) return
+
+            if (info.role === 'host') {
+                // 主机 → 指定观众（offer / ice）或广播（control）
+                if (msg.type === 'offer' || msg.type === 'ice') {
+                    const v = room.viewers.get(msg.to)
+                    if (v) safeSend(v.sock, { ...msg, to: undefined })
+                } else if (msg.type === 'control') {
+                    for (const v of room.viewers.values()) safeSend(v.sock, msg)
                 }
-                const other = found.role === 'host' ? found.room.viewer : found.room.host
-                if (other) safeSend(other, msg)
+            } else {
+                // 观众 → 主机（answer / ice），注入 from 让主机区分来源
+                if (msg.type === 'answer' || msg.type === 'ice') {
+                    if (room.host) safeSend(room.host.sock, { ...msg, from: info.peerId })
+                }
             }
         })
 
         sock.on('close', () => {
-            const removed = removeFromRooms(sock)
-            if (!removed) return
-            const other = removed.role === 'host' ? removed.room.viewer : removed.room.host
-            if (other) safeSend(other, { type: 'peer-leave', room: removed.roomId, peerRole: removed.role })
+            removeFromRoom(sock)
         })
     })
 

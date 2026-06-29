@@ -1,10 +1,11 @@
 import type { Signaling } from './useSignaling'
-// 主机端：抓屏 + WebRTC + replaceTrack + ICE restart + Mac 防休眠
+// 主机端：抓屏 + 一对多 Mesh WebRTC（每个观众一条独立连接）+ replaceTrack 换屏 + ICE restart + Mac 防休眠
 import { onBeforeUnmount, ref } from 'vue'
 import { allowSleep, preventSleep } from '~/utils/bridge'
+import { captureSource } from '~/utils/capture'
 import { ICE_SERVERS } from '~/utils/webrtc'
 
-// 画质预设 —— LAN 直连建议 high，跨网络可降到 medium
+// 画质预设 —— LAN 直连建议 high，多观众时建议降到 medium 减轻主机编码负载
 export interface QualityPreset {
     maxWidth: number
     maxHeight: number
@@ -23,50 +24,40 @@ export const QUALITY_PRESETS: Record<string, QualityPreset> = {
 // 当前用的预设 —— UI 可改
 let currentPreset: QualityPreset = QUALITY_PRESETS.high!
 
+// 一个观众一条 mesh 连接
+interface PeerConn {
+    pc: RTCPeerConnection
+    sender: RTCRtpSender | null
+    pendingIce: RTCIceCandidateInit[]
+}
+
 export const useHost = (signaling: Signaling) => {
     const sharing = ref(false)
     const stream = ref<MediaStream | null>(null)
-    const connectionState = ref<RTCPeerConnectionState>('new')
-    const iceState = ref<RTCIceConnectionState>('new')
     const trackEnded = ref(false)
     const error = ref<string | null>(null)
     const sleepLocked = ref(false)
+    // 已建立 WebRTC 连接（connected）的观众数
+    const connectedCount = ref(0)
 
-    let pc: RTCPeerConnection | null = null
-    let videoSender: RTCRtpSender | null = null
-    const pendingIce: RTCIceCandidateInit[] = []
+    // peerId → 该观众的连接
+    const peers = new Map<string, PeerConn>()
+    // 已加入信令但可能还没建连的观众（主机后开始共享时据此补建连）
+    const pendingViewers = new Set<string>()
 
-    const createPC = () => {
-        if (pc) return pc
-        const conn = new RTCPeerConnection({ iceServers: ICE_SERVERS })
-        conn.onicecandidate = (e) => {
-            if (e.candidate) signaling.send({ type: 'ice', candidate: e.candidate.toJSON() })
+    const updateConnectedCount = () => {
+        let n = 0
+        for (const { pc } of peers.values()) {
+            if (pc.connectionState === 'connected') n++
         }
-        conn.onconnectionstatechange = () => (connectionState.value = conn.connectionState)
-        conn.oniceconnectionstatechange = () => {
-            iceState.value = conn.iceConnectionState
-            if (conn.iceConnectionState === 'failed') {
-                try {
-                    conn.restartIce()
-                } catch {}
-            }
-        }
-        pc = conn
-        return conn
+        connectedCount.value = n
     }
 
-    const sendOffer = async (iceRestart = false) => {
-        if (!pc) return
-        const offer = await pc.createOffer({ iceRestart })
-        await pc.setLocalDescription(offer)
-        signaling.send({ type: 'offer', sdp: offer })
-    }
-
-    // 把当前 preset 的 maxBitrate 写到 RTCRtpSender —— 让 WebRTC encoder 拉满
-    const applyBitrate = async () => {
-        if (!videoSender) return
+    // 把当前 preset 的 maxBitrate 写到某条连接的 sender —— 让 encoder 拉满
+    const applyBitrate = async (entry: PeerConn) => {
+        if (!entry.sender) return
         try {
-            const params = videoSender.getParameters()
+            const params = entry.sender.getParameters()
             if (!params.encodings || params.encodings.length === 0) {
                 params.encodings = [{}]
             }
@@ -74,56 +65,74 @@ export const useHost = (signaling: Signaling) => {
             params.encodings[0]!.priority = 'high'
             // 降级时优先丢帧不丢分辨率
             params.degradationPreference = 'maintain-resolution'
-            await videoSender.setParameters(params)
+            await entry.sender.setParameters(params)
         } catch (e) {
             console.warn('setParameters failed:', e)
         }
     }
 
+    const sendOffer = async (peerId: string, iceRestart = false) => {
+        const entry = peers.get(peerId)
+        if (!entry) return
+        const offer = await entry.pc.createOffer({ iceRestart })
+        await entry.pc.setLocalDescription(offer)
+        signaling.send({ type: 'offer', to: peerId, sdp: offer })
+    }
+
+    // 为某个观众建立连接并发 offer（需已有 stream）
+    const createPeer = async (peerId: string) => {
+        if (peers.has(peerId) || !stream.value) return
+        const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS })
+        const entry: PeerConn = { pc, sender: null, pendingIce: [] }
+        peers.set(peerId, entry)
+
+        pc.onicecandidate = (e) => {
+            if (e.candidate) signaling.send({ type: 'ice', to: peerId, candidate: e.candidate.toJSON() })
+        }
+        pc.onconnectionstatechange = () => updateConnectedCount()
+        pc.oniceconnectionstatechange = () => {
+            if (pc.iceConnectionState === 'failed') {
+                try {
+                    pc.restartIce()
+                } catch {}
+                void sendOffer(peerId, true)
+            }
+        }
+
+        const videoTrack = stream.value.getVideoTracks()[0]
+        if (videoTrack) entry.sender = pc.addTrack(videoTrack, stream.value)
+        await applyBitrate(entry)
+        await sendOffer(peerId)
+    }
+
+    const closePeer = (peerId: string) => {
+        const entry = peers.get(peerId)
+        if (!entry) return
+        try {
+            entry.pc.close()
+        } catch {}
+        peers.delete(peerId)
+        updateConnectedCount()
+    }
+
     const setQuality = async (presetName: keyof typeof QUALITY_PRESETS) => {
         const preset = QUALITY_PRESETS[presetName]
-        if (preset) {
-            currentPreset = preset
-            await applyBitrate()
-        }
+        if (!preset) return
+        currentPreset = preset
+        for (const entry of peers.values()) await applyBitrate(entry)
     }
 
-    const attachTrack = async (newStream: MediaStream) => {
-        const conn = createPC()
-        const newVideo = newStream.getVideoTracks()[0]!
-        const newAudio = newStream.getAudioTracks()[0]
+    const capture = (sourceId: string): Promise<MediaStream> => captureSource(sourceId, currentPreset)
 
-        if (!videoSender) {
-            videoSender = conn.addTrack(newVideo, newStream)
-            if (newAudio) conn.addTrack(newAudio, newStream)
-        } else {
-            await videoSender.replaceTrack(newVideo)
-            const audioSender = conn.getSenders().find(s => s.track?.kind === 'audio')
-            if (audioSender && newAudio) await audioSender.replaceTrack(newAudio)
-        }
-
-        newVideo.onended = () => {
-            trackEnded.value = true
+    // 抓屏后给视频 track 挂中断监听（系统停止采集时置 trackEnded）
+    const watchTrackEnded = (s: MediaStream) => {
+        const v = s.getVideoTracks()[0]
+        if (v) {
+            v.onended = () => {
+                trackEnded.value = true
+            }
         }
     }
-
-    // Electron / Chromium 的老式 getUserMedia + chromeMediaSourceId 路径，
-    // mandatory.maxWidth/maxHeight 不设的话 Chrome 默认抓 720p；明确设到 1080p 才能拿原画
-    const capture = (sourceId: string): Promise<MediaStream> =>
-        navigator.mediaDevices.getUserMedia({
-            audio: false,
-            video: {
-                mandatory: {
-                    chromeMediaSource: 'desktop',
-                    chromeMediaSourceId: sourceId,
-                    maxWidth: currentPreset.maxWidth,
-                    maxHeight: currentPreset.maxHeight,
-                    minWidth: Math.min(1280, currentPreset.maxWidth),
-                    minHeight: Math.min(720, currentPreset.maxHeight),
-                    maxFrameRate: currentPreset.maxFrameRate,
-                },
-            } as any,
-        })
 
     const startShare = async (sourceId?: string) => {
         error.value = null
@@ -134,11 +143,9 @@ export const useHost = (signaling: Signaling) => {
             }
             const newStream = await capture(sourceId)
             stream.value = newStream
-            await attachTrack(newStream)
-            await applyBitrate()
-            if (pc && pc.signalingState === 'stable' && !pc.remoteDescription) {
-                await sendOffer()
-            }
+            watchTrackEnded(newStream)
+            // 为已加入信令的观众逐个建连
+            for (const peerId of pendingViewers) await createPeer(peerId)
             sharing.value = true
             sleepLocked.value = await preventSleep()
         } catch (e: any) {
@@ -155,57 +162,80 @@ export const useHost = (signaling: Signaling) => {
             const newStream = await capture(sourceId)
             stream.value?.getTracks().forEach(t => t.stop())
             stream.value = newStream
-            await attachTrack(newStream)
-            await applyBitrate()
+            watchTrackEnded(newStream)
+            // 换屏走 replaceTrack —— 所有观众无需重新协商
+            const videoTrack = newStream.getVideoTracks()[0]
+            if (videoTrack) {
+                for (const entry of peers.values()) {
+                    if (entry.sender) await entry.sender.replaceTrack(videoTrack)
+                }
+            }
             trackEnded.value = false
-            await sendOffer(true)
         } catch (e: any) {
             error.value = e?.message || '抓屏失败'
         }
+    }
+
+    // 关闭并清空所有观众连接（换房间号时调用，不动 stream / sharing）
+    const resetPeers = () => {
+        for (const entry of peers.values()) {
+            try {
+                entry.pc.close()
+            } catch {}
+        }
+        peers.clear()
+        pendingViewers.clear()
+        connectedCount.value = 0
     }
 
     const stopShare = async () => {
         sharing.value = false
         stream.value?.getTracks().forEach(t => t.stop())
         stream.value = null
-        videoSender = null
-        pc?.close()
-        pc = null
-        connectionState.value = 'closed'
-        iceState.value = 'closed'
+        resetPeers()
         await allowSleep()
         sleepLocked.value = false
     }
 
-    const handleAnswer = async (sdp: RTCSessionDescriptionInit) => {
-        if (!pc) return
-        await pc.setRemoteDescription(sdp)
-        for (const c of pendingIce.splice(0)) {
+    const handleAnswer = async (from: string, sdp: RTCSessionDescriptionInit) => {
+        const entry = peers.get(from)
+        if (!entry) return
+        await entry.pc.setRemoteDescription(sdp)
+        for (const c of entry.pendingIce.splice(0)) {
             try {
-                await pc.addIceCandidate(c)
+                await entry.pc.addIceCandidate(c)
             } catch {}
         }
     }
 
-    const handleIce = async (candidate: RTCIceCandidateInit) => {
-        if (!pc || !pc.remoteDescription) {
-            pendingIce.push(candidate)
+    const handleIce = async (from: string, candidate: RTCIceCandidateInit) => {
+        const entry = peers.get(from)
+        if (!entry) return
+        if (!entry.pc.remoteDescription) {
+            entry.pendingIce.push(candidate)
             return
         }
         try {
-            await pc.addIceCandidate(candidate)
+            await entry.pc.addIceCandidate(candidate)
         } catch {}
     }
 
-    const handlePeerJoin = async () => {
-        if (!pc || !sharing.value) return
-        await sendOffer(true)
+    const handlePeerJoin = async (peerId: string) => {
+        pendingViewers.add(peerId)
+        // 已在共享 → 立即为新观众建连；否则等 startShare
+        if (stream.value) await createPeer(peerId)
+    }
+
+    const handlePeerLeave = (peerId: string) => {
+        pendingViewers.delete(peerId)
+        closePeer(peerId)
     }
 
     signaling.onMessage(async (m) => {
-        if (m.type === 'answer') await handleAnswer(m.sdp)
-        else if (m.type === 'ice') await handleIce(m.candidate)
-        else if (m.type === 'peer-join') await handlePeerJoin()
+        if (m.type === 'answer' && m.from) await handleAnswer(m.from, m.sdp)
+        else if (m.type === 'ice' && m.from) await handleIce(m.from, m.candidate)
+        else if (m.type === 'peer-join' && m.peerId) await handlePeerJoin(m.peerId)
+        else if (m.type === 'peer-leave' && m.peerId) handlePeerLeave(m.peerId)
     })
 
     onBeforeUnmount(() => {
@@ -215,14 +245,14 @@ export const useHost = (signaling: Signaling) => {
     return {
         sharing,
         stream,
-        connectionState,
-        iceState,
         trackEnded,
         error,
         sleepLocked,
+        connectedCount,
         startShare,
         reShare,
         stopShare,
         setQuality,
+        resetPeers,
     }
 }
