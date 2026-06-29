@@ -14,11 +14,18 @@
 import { randomUUID } from 'node:crypto'
 import { WebSocket, WebSocketServer } from 'ws'
 
+// 房间最多观众数：超过 10 路 mesh 主机编码扛不住，拒绝新连接
+const MAX_VIEWERS = 10
+// 同一浏览器（clientId）最多观众数 —— 默认 1（防一人开多个标签占名额）
+// 测试时调大即可用同一浏览器多标签模拟多个观众
+const MAX_PER_CLIENT = 1
+
 type Role = 'host' | 'viewer'
 
 interface Peer {
     sock: WebSocket
     id: string
+    clientId?: string // viewer 才有，用于「每浏览器限额」
 }
 
 interface Room {
@@ -116,7 +123,18 @@ export function startSignaling(port: number): WebSocketServer {
                         safeSend(v.sock, { type: 'peer-join' })
                     }
                 } else {
-                    room.viewers.set(peerId, { sock, id: peerId })
+                    const clientId = typeof msg.clientId === 'string' && msg.clientId ? msg.clientId : peerId
+                    const sameClient = [...room.viewers.values()].filter(v => v.clientId === clientId).length
+                    const reason = room.viewers.size >= MAX_VIEWERS
+                        ? 'room-full'
+                        : sameClient >= MAX_PER_CLIENT ? 'client-limit' : null
+                    if (reason) {
+                        safeSend(sock, { type: 'rejected', reason })
+                        conns.delete(sock)
+                        if (!room.host && room.viewers.size === 0) rooms.delete(roomId)
+                        return
+                    }
+                    room.viewers.set(peerId, { sock, id: peerId, clientId })
                     safeSend(sock, { type: 'joined', role, peerId })
                     // 通知主机有新观众；同时若主机在线，告诉观众
                     if (room.host) {

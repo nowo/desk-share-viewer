@@ -51,16 +51,55 @@ watchEffect(() => {
     }
 })
 
+// 同浏览器多标签协调：被服务器拒（client-limit）的标签可一键「接管」
+// —— 通知正在看的旧标签退出，本标签随后接手（浏览器无法跨标签聚焦/关闭，只能这样转移）
+const tabId = Math.random().toString(36).slice(2)
+let bc: BroadcastChannel | null = null
+let waitingTakeover = false
+
+const onBcMessage = (e: MessageEvent) => {
+    const m = e.data
+    if (!m || m.tabId === tabId) return
+    if (m.type === 'takeover') {
+        // 只有「正在观看」的旧标签才让位；自己也是被拒标签则忽略（避免被一起踢回首页）
+        if (sig.rejected.value) return
+        sig.close()
+        bc?.postMessage({ type: 'released', tabId })
+        router.push('/')
+    } else if (m.type === 'released' && waitingTakeover) {
+        // 旧标签已让位 → 稍等其连接被服务器清理后重连
+        waitingTakeover = false
+        setTimeout(() => sig.connect({ room: roomId.value, role: 'viewer' }), 500)
+    }
+}
+
+const takeOver = () => {
+    waitingTakeover = true
+    bc?.postMessage({ type: 'takeover', tabId })
+    // 兜底：旧标签没响应也尝试重连
+    setTimeout(() => {
+        if (waitingTakeover) {
+            waitingTakeover = false
+            sig.connect({ room: roomId.value, role: 'viewer' })
+        }
+    }, 800)
+}
+
 onMounted(() => {
     if (!/^\d{6}$/.test(roomId.value)) {
         router.push('/')
         return
     }
+    bc = new BroadcastChannel(`desk-viewer-${roomId.value}`)
+    bc.onmessage = onBcMessage
     // signalHost 不传 → useSignaling 自动用 window.location.hostname
     sig.connect({ room: roomId.value, role: 'viewer' })
 })
 
-onBeforeUnmount(() => sig.close())
+onBeforeUnmount(() => {
+    sig.close()
+    bc?.close()
+})
 
 const showControls = ref(true)
 let hideTimer: ReturnType<typeof setTimeout> | null = null
@@ -84,6 +123,16 @@ const stateText = computed(() => {
 })
 
 const hasStream = computed(() => !!viewer.remoteStream.value)
+
+// 被服务器拒绝的提示文案
+const rejectedText = computed(() => {
+    switch (sig.rejected.value) {
+        case 'room-full': return '房间已满，已达到最多观看人数'
+        case 'client-limit': return '这个浏览器已在另一个标签观看本房间'
+        case null: return ''
+        default: return '无法加入房间'
+    }
+})
 </script>
 
 <template>
@@ -127,8 +176,29 @@ const hasStream = computed(() => !!viewer.remoteStream.value)
             </button>
         </div>
 
+        <!-- 被拒绝：房间满 / 同浏览器已在看 —— 终态，不再连接 -->
+        <div v-if="rejectedText"
+            class="p-6 text-center bg-slate-900 flex flex-col items-center inset-0 justify-center absolute z-20">
+            <i class="i-mdi-account-cancel text-5xl text-amber-400 mb-4" />
+            <div class="text-lg mb-2">
+                {{ rejectedText }}
+            </div>
+            <div class="mt-4 flex gap-2">
+                <!-- 同浏览器已在看：可把观看转移到本标签（旧标签会自动退出） -->
+                <button v-if="sig.rejected.value === 'client-limit'"
+                    class="text-sm text-white font-medium px-4 py-2 rounded bg-sky-600 inline-flex gap-1 items-center hover:bg-sky-500"
+                    @click="takeOver">
+                    <i class="i-mdi-swap-horizontal" /> 改用此标签观看
+                </button>
+                <button class="text-sm text-white font-medium px-4 py-2 rounded bg-slate-700 inline-flex gap-1 items-center hover:bg-slate-600"
+                    @click="back">
+                    <i class="i-mdi-arrow-left" /> 返回首页
+                </button>
+            </div>
+        </div>
+
         <!-- 等待中央浮层 -->
-        <div v-if="!hasStream"
+        <div v-else-if="!hasStream"
             class="bg-slate-900/80 flex flex-col items-center inset-0 justify-center absolute z-0">
             <i class="i-mdi-loading text-4xl text-sky-400 mb-4 animate-spin" />
             <div class="text-lg mb-2">

@@ -1,6 +1,7 @@
 // WebSocket 信令客户端：自动重连（指数退避）+ 心跳 + 重连后自动重 join
 import { ref } from 'vue'
 import { getSignalPort } from '~/utils/bridge'
+import { getClientId } from '~/utils/ids'
 
 type Role = 'host' | 'viewer'
 
@@ -16,6 +17,8 @@ export const useSignaling = () => {
     const peerJoined = ref(false)
     // host 端在线观众数（viewer 端恒 0）
     const peerCount = ref(0)
+    // 被服务器拒绝（房间满 / 同浏览器已在看），观众端据此提示并停止重连
+    const rejected = ref<string | null>(null)
 
     let currentRoom: string | null = null
     let currentRole: Role | null = null
@@ -76,7 +79,10 @@ export const useSignaling = () => {
             startPing()
             // join 必须最先发（服务器据此把这条连接绑到房间）
             if (currentRoom && currentRole) {
-                sock.send(JSON.stringify({ type: 'join', room: currentRoom, role: currentRole }))
+                const join: ISignalMsg = { type: 'join', room: currentRoom, role: currentRole }
+                // viewer 带浏览器标识，供服务器做「每浏览器限额」
+                if (currentRole === 'viewer') join.clientId = getClientId()
+                sock.send(JSON.stringify(join))
             }
             // flush 缓存的消息（offer / ice / 等）
             while (pendingQueue.length > 0) {
@@ -93,6 +99,16 @@ export const useSignaling = () => {
                 return
             }
             if (msg.type === 'pong') return
+            if (msg.type === 'rejected') {
+                // 房间满 / 同浏览器已在看：进入终态，不再重连
+                rejected.value = msg.reason || 'rejected'
+                manualClose = true
+                stopPing()
+                ws.value?.close()
+                ws.value = null
+                connected.value = false
+                return
+            }
             if (msg.type === 'peer-join') {
                 // host：msg.peerId=新观众；viewer：无 peerId，表示主机在线
                 if (currentRole === 'host' && msg.peerId) {
@@ -134,6 +150,7 @@ export const useSignaling = () => {
     const connect = (opts: { room: string, role: Role }) => {
         currentRoom = opts.room
         currentRole = opts.role
+        rejected.value = null
         void open()
     }
 
@@ -158,7 +175,7 @@ export const useSignaling = () => {
         return () => handlers.delete(fn)
     }
 
-    return { connected, peerJoined, peerCount, connect, close, send, onMessage }
+    return { connected, peerJoined, peerCount, rejected, connect, close, send, onMessage }
 }
 
 export type Signaling = ReturnType<typeof useSignaling>
