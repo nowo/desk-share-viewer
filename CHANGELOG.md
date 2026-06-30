@@ -1,6 +1,33 @@
 # Changelog
 
 
+## v0.1.6
+
+[compare changes](https://github.com/nowo/desk-share-viewer/compare/v0.1.5...v0.1.6)
+
+### 🚀 Enhancements
+
+- **viewer:** 观众端识别主机离开与锁屏暂停，附状态提示 ([d066d28](https://github.com/nowo/desk-share-viewer/commit/d066d28))
+- **multi-user:** 支持一个主机多个观众同时观看（一对多 Mesh） ([9ff2fc7](https://github.com/nowo/desk-share-viewer/commit/9ff2fc7))
+- **multi-user:** 限制最多 10 观众 + 每浏览器限额，被拒可一键改用此标签 ([443542e](https://github.com/nowo/desk-share-viewer/commit/443542e))
+
+### 🩹 Fixes
+
+- **signaling:** 观众断线重连撞自身幽灵连接卡死在 client-limit ([a9ce8d2](https://github.com/nowo/desk-share-viewer/commit/a9ce8d2))
+- **build:** Windows 无 bash 导致 pnpm dev 报错 ([a02402a](https://github.com/nowo/desk-share-viewer/commit/a02402a))
+
+### 💅 Refactors
+
+- **composables:** 清理重复与无用代码 ([342401c](https://github.com/nowo/desk-share-viewer/commit/342401c))
+
+### 📖 Documentation
+
+- **readme:** 补充观众端锁屏/断连状态提示说明 ([ae2ed6f](https://github.com/nowo/desk-share-viewer/commit/ae2ed6f))
+
+### ❤️ Contributors
+
+- Nowo ([@nowo](https://github.com/nowo))
+
 ## v0.1.5
 
 [compare changes](https://github.com/nowo/desk-share-viewer/compare/v0.1.4...v0.1.5)
