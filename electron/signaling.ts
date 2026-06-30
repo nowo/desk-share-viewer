@@ -26,6 +26,7 @@ interface Peer {
     sock: WebSocket
     id: string
     clientId?: string // viewer 才有，用于「每浏览器限额」
+    tabId?: string // viewer 才有，区分同标签重连 vs 另开标签
 }
 
 interface Room {
@@ -124,6 +125,16 @@ export function startSignaling(port: number): WebSocketServer {
                     }
                 } else {
                     const clientId = typeof msg.clientId === 'string' && msg.clientId ? msg.clientId : peerId
+                    const tabId = typeof msg.tabId === 'string' && msg.tabId ? msg.tabId : peerId
+                    // 同标签重连：踢掉自己的旧（幽灵）连接，避免重连时被自己挡住触发 client-limit
+                    for (const [vid, v] of [...room.viewers]) {
+                        if (v.clientId === clientId && v.tabId === tabId) {
+                            safeSend(v.sock, { type: 'kicked', reason: 'replaced-by-reconnect' })
+                            conns.delete(v.sock)
+                            room.viewers.delete(vid)
+                            if (room.host) safeSend(room.host.sock, { type: 'peer-leave', peerId: vid })
+                        }
+                    }
                     const sameClient = [...room.viewers.values()].filter(v => v.clientId === clientId).length
                     const reason = room.viewers.size >= MAX_VIEWERS
                         ? 'room-full'
@@ -134,7 +145,7 @@ export function startSignaling(port: number): WebSocketServer {
                         if (!room.host && room.viewers.size === 0) rooms.delete(roomId)
                         return
                     }
-                    room.viewers.set(peerId, { sock, id: peerId, clientId })
+                    room.viewers.set(peerId, { sock, id: peerId, clientId, tabId })
                     safeSend(sock, { type: 'joined', role, peerId })
                     // 通知主机有新观众；同时若主机在线，告诉观众
                     if (room.host) {

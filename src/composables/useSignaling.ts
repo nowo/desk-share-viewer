@@ -1,7 +1,7 @@
 // WebSocket 信令客户端：自动重连（指数退避）+ 心跳 + 重连后自动重 join
 import { ref } from 'vue'
 import { getSignalPort } from '~/utils/bridge'
-import { getClientId } from '~/utils/ids'
+import { getClientId, getTabId } from '~/utils/ids'
 
 type Role = 'host' | 'viewer'
 
@@ -80,8 +80,11 @@ export const useSignaling = () => {
             // join 必须最先发（服务器据此把这条连接绑到房间）
             if (currentRoom && currentRole) {
                 const join: ISignalMsg = { type: 'join', room: currentRoom, role: currentRole }
-                // viewer 带浏览器标识，供服务器做「每浏览器限额」
-                if (currentRole === 'viewer') join.clientId = getClientId()
+                // viewer 带浏览器标识 + 标签标识，供服务器做「每浏览器限额」并区分同标签重连
+                if (currentRole === 'viewer') {
+                    join.clientId = getClientId()
+                    join.tabId = getTabId()
+                }
                 sock.send(JSON.stringify(join))
             }
             // flush 缓存的消息（offer / ice / 等）

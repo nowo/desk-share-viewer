@@ -6,6 +6,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { usePanZoom } from '~/composables/usePanZoom'
 import { useSignaling } from '~/composables/useSignaling'
 import { useViewer } from '~/composables/useViewer'
+import { getTabId } from '~/utils/ids'
 
 const route = useRoute()
 const router = useRouter()
@@ -53,7 +54,7 @@ watchEffect(() => {
 
 // 同浏览器多标签协调：被服务器拒（client-limit）的标签可一键「接管」
 // —— 通知正在看的旧标签退出，本标签随后接手（浏览器无法跨标签聚焦/关闭，只能这样转移）
-const tabId = Math.random().toString(36).slice(2)
+const tabId = getTabId()
 let bc: BroadcastChannel | null = null
 let waitingTakeover = false
 
