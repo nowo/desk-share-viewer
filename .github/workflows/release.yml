@@ -79,7 +79,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       # macOS 自带 clang + Xcode CLT，能编 ObjC sidecar
-      # Windows / Linux 上 prep-sidecars.sh 会直接 exit 0 跳过
+      # Windows / Linux 上 prep-sidecars.mjs 会直接 exit 0 跳过
       - name: Build
         run: pnpm build
         env:
